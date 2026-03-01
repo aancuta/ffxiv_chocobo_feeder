@@ -16,15 +16,6 @@ using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
 
 namespace SamplePlugin;
 
-public sealed unsafe class ClickChocoboRow : ClickBase<ClickChocoboRow, AtkComponentListItemRenderer>
-{
-    public ClickChocoboRow(string name, nint addon) : base("ChocoboRow", addon)
-    {
-    }
-
-
-}
-
 public sealed class Plugin : IDalamudPlugin
 {
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
@@ -181,7 +172,7 @@ public sealed class Plugin : IDalamudPlugin
             if (!isCapped && isReady) {
                 Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
                 // the chocobo is not capped and ready, let's click it to start training
-                Click.SendClick("", currentChocobo);
+                
                 return;
             }
         }
