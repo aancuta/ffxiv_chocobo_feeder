@@ -41,11 +41,11 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
-    private const string CommandName = "/pmycommand";
+    private const string CommandName = "/easystables";
 
     public Configuration Configuration { get; init; }
 
-    public readonly WindowSystem WindowSystem = new("SamplePlugin");
+    public readonly WindowSystem WindowSystem = new("EasyStables");
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
 
@@ -60,7 +60,7 @@ public sealed class Plugin : IDalamudPlugin
         var goatImagePath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "goat.png");
 
         ConfigWindow = new ConfigWindow(this);
-        MainWindow = new MainWindow(this, goatImagePath);
+        MainWindow = new MainWindow(this);
 
         WindowSystem.AddWindow(ConfigWindow);
         WindowSystem.AddWindow(MainWindow);
@@ -84,7 +84,7 @@ public sealed class Plugin : IDalamudPlugin
         // Use /xllog to open the log window in-game
         // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
         Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
-        addonLifecycle.RegisterListener(AddonEvent.PreDraw, "HousingChocoboList", SyncWithGameState);
+        //addonLifecycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
     }
 
@@ -100,8 +100,6 @@ public sealed class Plugin : IDalamudPlugin
     {
         return training->GetText() == "Ready";
     }
-
-    //  if (icon->Alpha_2 == 255)
 
     private unsafe void SearchInventoryForFood(AddonEvent type, AddonArgs args)
     {
@@ -125,6 +123,7 @@ public sealed class Plugin : IDalamudPlugin
             var container = InventoryManager.Instance()->GetInventoryContainer(inv);
             if (container == null)
             {
+                Log.Error($"null inventory??");
                 continue;
             }
             for (int i = 0; i < container->Size; i++)
@@ -134,15 +133,16 @@ public sealed class Plugin : IDalamudPlugin
                 {
                     continue;
                 }
-                if (item->GetItemId() == 8165) // Krakka root
+                if (item->GetItemId() != 8165) // Krakka root
                 {
-                    var quantity = item->Quantity;
-                    var ag = AgentInventoryContext.Instance();
-                    ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());
-                    var contextMenu = (AtkUnitBase*)Svc.GameGui.GetAddonByName("ContextMenu", 1).Address;
-
-                    ECommons.Automation.Callback.Fire(contextMenu, true, 0, 0, 0, 0, 0);
+                    continue;
                 }
+                var quantity = item->Quantity;
+                var ag = AgentInventoryContext.Instance();
+                ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());
+                var contextMenu = (AtkUnitBase*)Svc.GameGui.GetAddonByName("ContextMenu", 1).Address;
+
+                ECommons.Automation.Callback.Fire(contextMenu, true, 0, 0, 0, 0, 0);
             }
         }
     }
@@ -163,7 +163,7 @@ public sealed class Plugin : IDalamudPlugin
         };
 
         var eventData = new AtkEventData();
-        FFXIVClientStructs.FFXIV.Client.UI.Addon
+
         chocobo->ReceiveEvent(
             AtkEventType.ButtonClick,
             0,      // Param — item index if needed
@@ -258,7 +258,7 @@ public sealed class Plugin : IDalamudPlugin
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
             if (!isCapped && isReady || chocoboNameTextNode->GetText() == "Carrot") {
-                //Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
+                Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
                 // the chocobo is not capped and ready, let's click it to start training
 
                 ClickChocobo(currentChocobo);
