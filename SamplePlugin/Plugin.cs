@@ -1,10 +1,16 @@
-﻿using Dalamud.Game.Command;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Game.Command;
+using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
-using System.IO;
-using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Graphics;
+using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using SamplePlugin.Windows;
+using System.IO;
+using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
 
 namespace SamplePlugin;
 
@@ -26,7 +32,7 @@ public sealed class Plugin : IDalamudPlugin
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
 
-    public Plugin()
+    public Plugin(IDalamudPluginInterface dalamud, ICommandManager commmandManager, IPluginLog log, INotificationManager notificationManager, IAddonLifecycle addonLifecycle)
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
@@ -58,6 +64,118 @@ public sealed class Plugin : IDalamudPlugin
         // Use /xllog to open the log window in-game
         // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
         Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
+
+
+        addonLifecycle.RegisterListener(AddonEvent.PreDraw, "HousingChocoboList", SyncWithGameState);
+    }
+
+    private unsafe bool IsChocoboCapped(AtkTextNode* rank)
+    {
+        var color = rank->TextColor.RGBA;
+
+        // Log.Information($"===Color {color}===");
+        return color != 0xFFC5E1EE; // uncapped is 0xFF378EF0
+    }
+
+    private unsafe bool IsChocoboReady(AtkTextNode* training)
+    {
+        return training->GetText() == "Ready";
+    }
+
+    private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
+    {
+        if (!args.Addon.IsVisible || !args.Addon.IsReady) return;
+
+        var addonAddress = args.Addon.Address;
+
+        var window = (AddonChocoboBreedTraining*)addonAddress; // has ID 1
+        //window->Close(true); // yes! we got the right window
+        // the root has multiple children:
+        // #22 Window Component Node [+11]
+        // #5 Res Node [+9] <- this is the parent of the parent of the chocobo list
+        // #3 Listcomponent node [+25] <- this contains the stables list
+        var stablesList = window->GetNodeById(3);
+        if (stablesList == null)
+        {
+            Log.Error($"null stables list??");
+            return;
+        }
+
+        var innerChocoboListRaw = window->GetNodeById(18);
+        if (innerChocoboListRaw == null)
+        {
+            Log.Error($"null inner chocobo list??");
+            return;
+        }
+        
+        var innerChocoboListAsAtkComponentList = innerChocoboListRaw->GetAsAtkComponentList();
+        if (innerChocoboListAsAtkComponentList == null) {
+            Log.Error($"cannot cast inner chocobo list??");
+            return;
+        }
+
+        var allChocobos = innerChocoboListAsAtkComponentList->UldManager.NodeList;
+        for (int i = 0; i < innerChocoboListAsAtkComponentList->UldManager.NodeListCount; ++i)
+        {
+            // [#41015] ListItemRenderer Component Node [+20]
+            var currentChocoboRaw = allChocobos[i];
+            if (currentChocoboRaw == null)
+            {
+                Log.Error($"null chocobo??");
+                break;
+            }
+            var currentChocobo = currentChocoboRaw->GetAsAtkComponentListItemRenderer();
+            if (currentChocobo == null)
+            {
+                continue;
+            }
+            // [#2] Res Node [+8]
+            var rowRaw = currentChocobo->GetNodeById(2);
+            if (rowRaw == null)
+            {
+                Log.Error($"null row??");
+                break;
+            }
+
+            // [#18] Text Node < whole row - ignore?
+            // [#15] Res Node - time left until training ready / "Ready"
+            // [#14] Base Component Node - dps
+            // [#13] Base Component Node - heal
+            // [#12] Base Component Node - tank
+            // [#9] Res Node [+2] - rank < colored differently if capped!
+            // [#6] Res Node [+2] - owner
+            // [#3] Res Node [+2] - name
+            var chocoboNameRaw = currentChocobo->GetNodeById(4);
+            var chocoboOwnerRaw = currentChocobo->GetNodeById(7);
+            var chocoboRankRaw = currentChocobo->GetNodeById(10);
+            var trainingRaw = currentChocobo->GetNodeById(16);
+            if (chocoboNameRaw == null || chocoboOwnerRaw == null || chocoboRankRaw == null || trainingRaw == null)
+            {
+                Log.Error($"cannot split row??");
+                break;
+            }
+            var chocoboNameTextNode = chocoboNameRaw->GetAsAtkTextNode();
+            var chocoboOwnerTextNode = chocoboOwnerRaw->GetAsAtkTextNode();
+            var chocoboRankTextNode = chocoboRankRaw->GetAsAtkTextNode();
+            var trainingTextNode = trainingRaw->GetAsAtkTextNode();
+
+            if (chocoboNameTextNode->GetText() == "" && chocoboOwnerTextNode->GetText() == "")
+            {
+                // idk what this is, don't touch it
+                continue;
+            }
+
+            bool isCapped = IsChocoboCapped(chocoboRankTextNode);
+            bool isReady = IsChocoboReady(trainingTextNode);
+            if (!isCapped && isReady) {
+                Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
+                // the chocobo is not capped and ready, let's click it to start training
+                currentChocobo->StartDragDrop();
+                return;
+            }
+        }
+
+        // Log.Information($"===resNode: {(int)resNode}===");
     }
 
     public void Dispose()
