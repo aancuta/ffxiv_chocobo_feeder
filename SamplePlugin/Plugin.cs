@@ -49,7 +49,7 @@ public sealed class Plugin : IDalamudPlugin
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
 
-    private bool isInventoryOpenThroughPlugin = false;
+    private bool isInventoryOpenThroughStables = false;
 
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commmandManager, IPluginLog log, INotificationManager notificationManager, IAddonLifecycle addonLifecycle)
     {
@@ -80,19 +80,29 @@ public sealed class Plugin : IDalamudPlugin
         // Adds another button doing the same but for the main ui of the plugin
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
-        // Add a simple message to the log with level set to information
         // Use /xllog to open the log window in-game
-        // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
-        Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
-        //addonLifecycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
+
+        addonLifecycle.RegisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
+        addonLifecycle.RegisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
+
+        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+    }
+
+    private void HookStablesClose(AddonEvent type, AddonArgs args)
+    {
+        isInventoryOpenThroughStables = false;
+    }
+
+    private void HookStablesOpen(AddonEvent type, AddonArgs args)
+    {
+        isInventoryOpenThroughStables = true;
     }
 
     private unsafe bool IsChocoboCapped(AtkTextNode* rank)
     {
         var color = rank->TextColor.RGBA;
 
-        // Log.Information($"===Color {color}===");
         return color != 0xFFC5E1EE; // uncapped is 0xFF378EF0
     }
 
@@ -103,13 +113,13 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe void SearchInventoryForFood(AddonEvent type, AddonArgs args)
     {
-        // inspired by artisan: https://github.com/PunishXIV/Artisan/blob/9eb581257f96186c42b6652599c1ab40a501a3f0/Artisan/Tasks/TaskSelectRetainer.cs#L260
-        //if (!isInventoryOpenThroughPlugin)
-        //{
-        //    // don't break non-automated inventory open
-        //    return;
-        //}
+        if (!isInventoryOpenThroughStables)
+        {
+            // don't break non-automated inventory open
+            return;
+        }
 
+        // inspired by artisan: https://github.com/PunishXIV/Artisan/blob/9eb581257f96186c42b6652599c1ab40a501a3f0/Artisan/Tasks/TaskSelectRetainer.cs#L260
         var inventories = new List<InventoryType>
         {
             InventoryType.Inventory1,
@@ -137,24 +147,27 @@ public sealed class Plugin : IDalamudPlugin
                 {
                     continue;
                 }
+
                 var quantity = item->Quantity;
                 var ag = AgentInventoryContext.Instance();
                 ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());
                 var contextMenu = (AtkUnitBase*)Svc.GameGui.GetAddonByName("ContextMenu", 1).Address;
-
                 ECommons.Automation.Callback.Fire(contextMenu, true, 0, 0, 0, 0, 0);
             }
         }
     }
 
-    unsafe void ClickChocobo(AtkComponentListItemRenderer* chocobo)
+    unsafe void ClickChocobo(AtkComponentListItemRenderer* chocobo, AtkComponentList* outerListListener, int idx)
     {
-        var atkEvent = new AtkEvent
+
+        var owner = chocobo->OwnerNode;
+
+        var atkEvent = new AtkEvent()
         {
-            Node = (AtkResNode*)chocobo->OwnerNode,
-            Target = (AtkEventTarget*)chocobo,      // the item renderer itself
-            Listener = (AtkEventListener*)chocobo,    // same
-            Param = 0,                             // matches arg3 of ReceiveEvent
+            Node = (AtkResNode*)outerListListener,
+            Target = (AtkEventTarget*)owner,
+            Listener = (AtkEventListener*)outerListListener,
+            Param = 0,
             State = new AtkEventState
             {
                 EventType = AtkEventType.ButtonClick,
@@ -162,15 +175,34 @@ public sealed class Plugin : IDalamudPlugin
             }
         };
 
-        var eventData = new AtkEventData();
+        //// Use the AtkEventData.AtkInputData type (expected by HandleButtonPress)
+        //var inputDataDown = new AtkEventData.AtkMouseData()
+        //{
+        //    ButtonId = 0, // Left click
+        //    Modifier = AtkEventData.AtkMouseData.ModifierFlag.None,
+        //};
+        //outerListListener->HandleMouseDown(&atkEvent, &inputDataDown);
+        //var inputDataUp = new AtkEventData.AtkMouseData()
+        //{
+        //    ButtonId = 0, // Left click
+        //    Modifier = AtkEventData.AtkMouseData.ModifierFlag.None,
+        //};
+        //outerListListener->HandleMouseDown(&atkEvent, &inputDataUp);
+        //chocobo->HandleMouseUpEvent(&inputDataUp);
 
-        chocobo->ReceiveEvent(
-            AtkEventType.ButtonClick,
-            0,      // Param — item index if needed
-            &atkEvent,
-            &eventData
-        );
-    }
+        var castedOwner = owner->GetAsAtkComponentButton();
+        if (castedOwner == null)
+        {
+            return;
+        }
+        //castedOwner->ClickAddonButton((AtkUnitBase*)Svc.GameGui.GetAddonByName("Button", 1).Address);
+
+        //var eventData = new AtkEvent();
+        //var inputData = stackalloc int[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        // castedOwner->ReceiveEvent(AtkEventType.ButtonClick, 0, &eventData); // this crashes and deletes the kraka roots
+
+        Log.Information($"Target: {((int)atkEvent.Target).ToString("X")} Listener: {((int)atkEvent.Listener).ToString("X")}");
+    }   
 
     private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
     {
@@ -257,13 +289,13 @@ public sealed class Plugin : IDalamudPlugin
             
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
-            if (!isCapped && isReady || chocoboNameTextNode->GetText() == "Carrot") {
-                Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
+            if (!isCapped && isReady || chocoboNameTextNode->GetText() == "Varus") {
+                //Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
                 // the chocobo is not capped and ready, let's click it to start training
 
-                ClickChocobo(currentChocobo);
+                ClickChocobo(currentChocobo, innerChocoboListAsAtkComponentList, i);
                 // this should open the inventory, leading us to the other callback.
-                isInventoryOpenThroughPlugin = true;
+                isInventoryOpenThroughStables = true;
                 return;
             }
         }
