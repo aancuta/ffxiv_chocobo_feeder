@@ -170,7 +170,6 @@ public sealed class Plugin : IDalamudPlugin
             if (!isCapped && isReady) {
                 Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
                 // the chocobo is not capped and ready, let's click it to start training
-                currentChocobo->StartDragDrop();
                 return;
             }
         }
