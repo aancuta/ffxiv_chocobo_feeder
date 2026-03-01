@@ -34,6 +34,8 @@ public sealed class Plugin : IDalamudPlugin
     private ConfigWindow ConfigWindow { get; init; }
     private MainWindow MainWindow { get; init; }
 
+    private bool isInventoryOpenThroughPlugin = false;
+
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commmandManager, IPluginLog log, INotificationManager notificationManager, IAddonLifecycle addonLifecycle)
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
@@ -67,6 +69,7 @@ public sealed class Plugin : IDalamudPlugin
         // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
         Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
         addonLifecycle.RegisterListener(AddonEvent.PreDraw, "HousingChocoboList", SyncWithGameState);
+        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
     }
 
     private unsafe bool IsChocoboCapped(AtkTextNode* rank)
@@ -80,6 +83,45 @@ public sealed class Plugin : IDalamudPlugin
     private unsafe bool IsChocoboReady(AtkTextNode* training)
     {
         return training->GetText() == "Ready";
+    }
+
+    private unsafe void SearchInventoryForFood(AddonEvent type, AddonArgs args)
+    {
+        if (!isInventoryOpenThroughPlugin)
+        {
+            // don't break non-automated inventory open
+            return;
+        }
+        var addonAddress = (AddonInventoryGrid*)args.Addon.Address;
+
+        // we have the inventory open, let's search for the food:
+        var allInventoryItems = addonAddress->UldManager.NodeList;
+        for (int i = 0; i < addonAddress->UldManager.NodeListCount; ++i)
+        {
+            var currentInventorySlot = allInventoryItems[i];
+
+            //Log.Info($"FOUND INVENTORY SLOT!! {i}", i);
+            var dragDropComponent = currentInventorySlot->GetAsAtkComponentDragDrop();
+            if (dragDropComponent == null)
+            {
+                // we only care about DragDrop Component Nodes, as those are the actual slots for items
+                continue;
+            }
+
+            // var icon = dragDropComponent->AtkComponentIcon;
+            var icon = dragDropComponent->GetNodeById(2);
+            if (icon == null)
+            {
+                Log.Error($"null icon??");
+                continue;
+            }
+
+            if (icon->Alpha_2 == 255)
+            {
+                //Log.Info($"FOUND FOOD!!");
+                // new AddonMaster.Talk(icon)-> // there is no RightClick????
+            }
+        }
     }
 
     private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
@@ -171,6 +213,8 @@ public sealed class Plugin : IDalamudPlugin
                 Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
                 // the chocobo is not capped and ready, let's click it to start training
                 new AddonMaster.Talk(currentChocobo).Click();
+                // this should open the inventory, leading us to the other callback.
+                isInventoryOpenThroughPlugin = true;
                 return;
             }
         }
