@@ -1,3 +1,5 @@
+using ClickLib;
+using ClickLib.Bases;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.Command;
@@ -13,6 +15,15 @@ using System.IO;
 using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
 
 namespace SamplePlugin;
+
+public sealed unsafe class ClickChocoboRow : ClickBase<ClickChocoboRow, AtkComponentListItemRenderer>
+{
+    public ClickChocoboRow(string name, nint addon) : base("ChocoboRow", addon)
+    {
+    }
+
+
+}
 
 public sealed class Plugin : IDalamudPlugin
 {
@@ -65,7 +76,7 @@ public sealed class Plugin : IDalamudPlugin
         // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
         Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
 
-
+        Click.Initialize();
         addonLifecycle.RegisterListener(AddonEvent.PreDraw, "HousingChocoboList", SyncWithGameState);
     }
 
@@ -170,6 +181,7 @@ public sealed class Plugin : IDalamudPlugin
             if (!isCapped && isReady) {
                 Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
                 // the chocobo is not capped and ready, let's click it to start training
+                Click.SendClick("", currentChocobo);
                 return;
             }
         }
