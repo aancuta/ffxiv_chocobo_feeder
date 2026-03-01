@@ -4,3 +4,6 @@
 [submodule "ECommons"]
 	path = ECommons
 	url = https://github.com/NightmareXIV/ECommons
+[submodule "ViGEmBus"]
+	path = ViGEmBus
+	url = https://github.com/nefarius/ViGEmBus

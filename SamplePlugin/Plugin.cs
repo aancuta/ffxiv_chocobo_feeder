@@ -1,19 +1,34 @@
 
+using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Game.ClientState.GamePad;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using ECommons;
+using ECommons.Automation;
+using ECommons.Automation.UIInput;
+using ECommons.DalamudServices;
+using ECommons.Gamepad;
 using ECommons.UIHelpers.AddonMasterImplementations;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
+using FFXIVClientStructs.FFXIV.Client.System.Input;
 using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using SamplePlugin.Windows;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Threading;
+using static ECommons.UIHelpers.AddonMasterImplementations.AddonMaster;
+using static FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.VertexShader;
 using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
-
 namespace SamplePlugin;
 
 public sealed class Plugin : IDalamudPlugin
@@ -38,6 +53,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commmandManager, IPluginLog log, INotificationManager notificationManager, IAddonLifecycle addonLifecycle)
     {
+        ECommonsMain.Init(dalamud, this, Module.All);
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
         // You might normally want to embed resources and load them from the manifest stream
@@ -85,43 +101,75 @@ public sealed class Plugin : IDalamudPlugin
         return training->GetText() == "Ready";
     }
 
+    //  if (icon->Alpha_2 == 255)
+
     private unsafe void SearchInventoryForFood(AddonEvent type, AddonArgs args)
     {
-        if (!isInventoryOpenThroughPlugin)
-        {
-            // don't break non-automated inventory open
-            return;
-        }
-        var addonAddress = (AddonInventoryGrid*)args.Addon.Address;
+        // inspired by artisan: https://github.com/PunishXIV/Artisan/blob/9eb581257f96186c42b6652599c1ab40a501a3f0/Artisan/Tasks/TaskSelectRetainer.cs#L260
+        //if (!isInventoryOpenThroughPlugin)
+        //{
+        //    // don't break non-automated inventory open
+        //    return;
+        //}
 
-        // we have the inventory open, let's search for the food:
-        var allInventoryItems = addonAddress->UldManager.NodeList;
-        for (int i = 0; i < addonAddress->UldManager.NodeListCount; ++i)
+        var inventories = new List<InventoryType>
         {
-            var currentInventorySlot = allInventoryItems[i];
+            InventoryType.Inventory1,
+            InventoryType.Inventory2,
+            InventoryType.Inventory3,
+            InventoryType.Inventory4
+        };
 
-            //Log.Info($"FOUND INVENTORY SLOT!! {i}", i);
-            var dragDropComponent = currentInventorySlot->GetAsAtkComponentDragDrop();
-            if (dragDropComponent == null)
+        foreach (var inv in inventories)
+        {
+            var container = InventoryManager.Instance()->GetInventoryContainer(inv);
+            if (container == null)
             {
-                // we only care about DragDrop Component Nodes, as those are the actual slots for items
                 continue;
             }
-
-            // var icon = dragDropComponent->AtkComponentIcon;
-            var icon = dragDropComponent->GetNodeById(2);
-            if (icon == null)
+            for (int i = 0; i < container->Size; i++)
             {
-                Log.Error($"null icon??");
-                continue;
-            }
+                var item = container->GetInventorySlot(i);
+                if (item == null)
+                {
+                    continue;
+                }
+                if (item->GetItemId() == 8165) // Krakka root
+                {
+                    var quantity = item->Quantity;
+                    var ag = AgentInventoryContext.Instance();
+                    ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());
+                    var contextMenu = (AtkUnitBase*)Svc.GameGui.GetAddonByName("ContextMenu", 1).Address;
 
-            if (icon->Alpha_2 == 255)
-            {
-                //Log.Info($"FOUND FOOD!!");
-                // new AddonMaster.Talk(icon)-> // there is no RightClick????
+                    ECommons.Automation.Callback.Fire(contextMenu, true, 0, 0, 0, 0, 0);
+                }
             }
         }
+    }
+
+    unsafe void ClickChocobo(AtkComponentListItemRenderer* chocobo)
+    {
+        var atkEvent = new AtkEvent
+        {
+            Node = (AtkResNode*)chocobo->OwnerNode,
+            Target = (AtkEventTarget*)chocobo,      // the item renderer itself
+            Listener = (AtkEventListener*)chocobo,    // same
+            Param = 0,                             // matches arg3 of ReceiveEvent
+            State = new AtkEventState
+            {
+                EventType = AtkEventType.ButtonClick,
+                StateFlags = AtkEventStateFlags.None,
+            }
+        };
+
+        var eventData = new AtkEventData();
+        FFXIVClientStructs.FFXIV.Client.UI.Addon
+        chocobo->ReceiveEvent(
+            AtkEventType.ButtonClick,
+            0,      // Param — item index if needed
+            &atkEvent,
+            &eventData
+        );
     }
 
     private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
@@ -131,7 +179,6 @@ public sealed class Plugin : IDalamudPlugin
         var addonAddress = args.Addon.Address;
 
         var window = (AddonChocoboBreedTraining*)addonAddress; // has ID 1
-        //window->Close(true); // yes! we got the right window
         // the root has multiple children:
         // #22 Window Component Node [+11]
         // #5 Res Node [+9] <- this is the parent of the parent of the chocobo list
@@ -179,7 +226,7 @@ public sealed class Plugin : IDalamudPlugin
                 break;
             }
 
-            // [#18] Text Node < whole row - ignore?
+            // [#18] Text Node < whole row TextNode - ignore?
             // [#15] Res Node - time left until training ready / "Ready"
             // [#14] Base Component Node - dps
             // [#13] Base Component Node - heal
@@ -191,6 +238,7 @@ public sealed class Plugin : IDalamudPlugin
             var chocoboOwnerRaw = currentChocobo->GetNodeById(7);
             var chocoboRankRaw = currentChocobo->GetNodeById(10);
             var trainingRaw = currentChocobo->GetNodeById(16);
+            var wholeRowTextNode = currentChocobo->GetNodeById(18);
             if (chocoboNameRaw == null || chocoboOwnerRaw == null || chocoboRankRaw == null || trainingRaw == null)
             {
                 Log.Error($"cannot split row??");
@@ -206,13 +254,14 @@ public sealed class Plugin : IDalamudPlugin
                 // idk what this is, don't touch it
                 continue;
             }
-
+            
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
-            if (!isCapped && isReady || chocoboNameTextNode->GetText() == "Mashiro") {
-                Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
+            if (!isCapped && isReady || chocoboNameTextNode->GetText() == "Carrot") {
+                //Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
                 // the chocobo is not capped and ready, let's click it to start training
-                new AddonMaster.Talk(currentChocobo).Click();
+
+                ClickChocobo(currentChocobo);
                 // this should open the inventory, leading us to the other callback.
                 isInventoryOpenThroughPlugin = true;
                 return;
