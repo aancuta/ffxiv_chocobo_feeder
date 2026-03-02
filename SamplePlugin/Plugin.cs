@@ -20,7 +20,6 @@ using FFXIVClientStructs.FFXIV.Client.System.Input;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
-using EasyStables.Windows;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -48,36 +47,23 @@ public sealed class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("EasyStables");
-    private ConfigWindow ConfigWindow { get; init; }
-    private MainWindow MainWindow { get; init; }
 
+    private bool isEnabled = true;
     private bool isInventoryOpenThroughStables = false;
+
+    internal IAddonLifecycle lifeCycle { get; init; }
+    [PluginService] internal IChatGui ChatGui { get; private set; }
 
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commmandManager, IPluginLog log, INotificationManager notificationManager, IAddonLifecycle addonLifecycle)
     {
         ECommonsMain.Init(dalamud, this, Module.All);
+        lifeCycle = addonLifecycle;
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-
-        ConfigWindow = new ConfigWindow(this);
-        MainWindow = new MainWindow(this);
-
-        WindowSystem.AddWindow(ConfigWindow);
-        WindowSystem.AddWindow(MainWindow);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "A useful message to display in /xlhelp"
+            HelpMessage = "Enable / Disable EasyStables"
         });
-
-        // Tell the UI system that we want our windows to be drawn through the window system
-        PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
-
-        // This adds a button to the plugin installer entry of this plugin which allows
-        // toggling the display status of the configuration ui
-        PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUi;
-
-        // Adds another button doing the same but for the main ui of the plugin
-        PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
         // Use /xllog to open the log window in-game
 
@@ -86,6 +72,18 @@ public sealed class Plugin : IDalamudPlugin
 
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+    }
+    public void Dispose()
+    {
+        isEnabled = false;
+        ECommonsMain.Dispose();
+        lifeCycle.UnregisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
+        lifeCycle.UnregisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
+
+        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
+        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+
+        CommandManager.RemoveHandler(CommandName);
     }
 
     private void HookStablesClose(AddonEvent type, AddonArgs args)
@@ -112,7 +110,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe void SearchInventoryForFood(AddonEvent type, AddonArgs args)
     {
-        if (!isInventoryOpenThroughStables)
+        if (!isEnabled || !isInventoryOpenThroughStables)
         {
             // don't break non-automated inventory open
             return;
@@ -158,7 +156,6 @@ public sealed class Plugin : IDalamudPlugin
 
     unsafe void ClickChocobo(AtkComponentListItemRenderer* chocobo, AtkComponentList* outerListListener, int idx)
     {
-
         var owner = chocobo->OwnerNode;
 
         var atkEvent = new AtkEvent()
@@ -206,6 +203,11 @@ public sealed class Plugin : IDalamudPlugin
     private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
     {
         if (!args.Addon.IsVisible || !args.Addon.IsReady) return;
+
+        if (!isEnabled)
+        {
+            return;
+        }
 
         var addonAddress = args.Addon.Address;
 
@@ -302,27 +304,12 @@ public sealed class Plugin : IDalamudPlugin
         // Log.Information($"===resNode: {(int)resNode}===");
     }
 
-    public void Dispose()
-    {
-        // Unregister all actions to not leak anything during disposal of plugin
-        PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
-        PluginInterface.UiBuilder.OpenConfigUi -= ToggleConfigUi;
-        PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
-        
-        WindowSystem.RemoveAllWindows();
-
-        ConfigWindow.Dispose();
-        MainWindow.Dispose();
-
-        CommandManager.RemoveHandler(CommandName);
-    }
-
     private void OnCommand(string command, string args)
     {
-        // In response to the slash command, toggle the display status of our main ui
-        MainWindow.Toggle();
+        if (command.ToLower() != "/easystables") return;
+
+        isEnabled = !isEnabled;
+        ChatGui.Print(this.isEnabled ? "Easy Stables: Enabled" : "Easy Stables: Disabled");
     }
-    
-    public void ToggleConfigUi() => ConfigWindow.Toggle();
-    public void ToggleMainUi() => MainWindow.Toggle();
+   
 }
