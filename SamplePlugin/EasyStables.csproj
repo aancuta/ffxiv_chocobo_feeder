@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Dalamud.NET.Sdk/14.0.2">
+  <PropertyGroup>
+      <Name>EasyStables</Name>
+      <Description>Tired of feeding birds? :)</Description>
+      <Punchline>Tired of feeding birds? :)</Punchline>
+      <Author>Black Bird</Author>
+      <Version>1.0.0.0</Version>
+      <RootNamespace>EasyStables</RootNamespace>
+      <Copyright>MIT</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ECommons\ECommons\ECommons.csproj" />
+  </ItemGroup>
+</Project>
