@@ -4,6 +4,7 @@
       <Name>EasyStables</Name>
       <Description>Tired of feeding birds? :)</Description>
       <Punchline>Tired of feeding birds? :)</Punchline>
+      <Tags>Stables,Bird,Chocobo</Tags>
       <Author>Black Bird</Author>
       <Version>1.0.0.0</Version>
       <RootNamespace>EasyStables</RootNamespace>
