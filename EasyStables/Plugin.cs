@@ -100,7 +100,7 @@ public sealed class Plugin : IDalamudPlugin
 
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
 
-        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "ContextMenu", ContextMenuOpen);
+        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "ContextMenu", ContextMenuDraw);
     }
     public void Dispose()
     {
@@ -114,7 +114,7 @@ public sealed class Plugin : IDalamudPlugin
 
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
 
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "ContextMenu", ContextMenuOpen);
+        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "ContextMenu", ContextMenuDraw);
 
         CommandManager.RemoveHandler(CommandName);
     }
@@ -126,7 +126,7 @@ public sealed class Plugin : IDalamudPlugin
         timeToDoStuffInContextMenu = 0;
     }
 
-    private unsafe void ContextMenuOpen(AddonEvent type, AddonArgs args)
+    private unsafe void ContextMenuDraw(AddonEvent type, AddonArgs args)
     {
         if (timeToDoStuffInContextMenu == 0)
         {
