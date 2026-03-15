@@ -137,9 +137,29 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private unsafe void LogGameEvent(AtkEvent* atkEvent)
+    {
+        PluginLog.Information($"""
+                Logging atkEvent: {((int)atkEvent).ToString("X")}
+            """);
+
+        PluginLog.Information($"""
+                atkEvent->Node->NodeId: {(atkEvent->Node == null ? "-" : atkEvent->Node->NodeId)}
+                atkEvent->Target: {((int)(atkEvent->Target)).ToString("X")},
+                atkEvent->Listener: {((int)(atkEvent->Listener)).ToString("X")},
+                atkEvent->Param: {atkEvent->Param}
+                atkEvent->NextEvent: {((int)(atkEvent->NextEvent)).ToString("X")},
+                atkEvent->StateEventType: {atkEvent->State.EventType}
+                atkEvent->StateFlags: {atkEvent->State.StateFlags}
+                """);
+        if (atkEvent->NextEvent != null)
+        {
+            LogGameEvent(atkEvent->NextEvent);
+        }
+    }
+
     private unsafe void PreEventHook(AddonEvent type, AddonArgs args)
     {
-
         if (args is AddonReceiveEventArgs evt)
         {
             var atkEvent = (AtkEvent*)evt.AtkEvent;
@@ -154,11 +174,12 @@ public sealed class Plugin : IDalamudPlugin
                 Log.Error($"stables list is null??");
                 return;
             }
-
-            //var target = (AtkEventTarget*)stablesList;
-
-            //var data = MemoryHelper.ReadRaw(evt.AtkEventData, 40);
-
+            if (evt.AtkEventType != (byte)AtkEventType.ListItemClick)
+            {
+                return;
+            }
+            var target = (AtkEventTarget*)stablesList;
+            var data = MemoryHelper.ReadRaw(evt.AtkEventData, 40);
             //PluginLog.Information($"""
             //    atkEvent->Node->NodeId: {(atkEvent->Node == null ? "-" : atkEvent->Node->NodeId)}
             //    atkEvent->Target: {((int)(atkEvent->Target)).ToString("X")},
@@ -171,9 +192,9 @@ public sealed class Plugin : IDalamudPlugin
             //    data: {data.ToHexString()}
             //    CursorTarget: {(stablesAddon->CursorTarget == null ? "-" : stablesAddon->CursorTarget->NodeId)}
             //    """);
-
+            //LogGameEvent(atkEvent);
             //PluginLog.Information($"""
-            //    atkEventData->ListItemRenderer: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItemRenderer).ToString("X")}
+            //    atkEventData->ListItemRenderer: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItemRenderer).ToString("X")}  
             //    atkEventData->ListItem: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItem).ToString("X")}
             //    atkEventData->SelectedIndex: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->HoveredItemIndex3)}
             //    atkEventData->MouseButtonId: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseButtonId)}
@@ -322,7 +343,7 @@ public sealed class Plugin : IDalamudPlugin
             Log.Information($"setSelectedStablesListIdx: cannot cast stables list??");
             return;
         }
-        component->SelectedItemIndex = selectedItemIndex;
+        component->SelectedItemIndex = stablesListIdxBeforeFeeding = selectedItemIndex;
     }
 
     private unsafe void SearchInventoryForFood(AddonEvent type, AddonArgs args)
@@ -383,29 +404,66 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    unsafe void ClickChocobo(AtkComponentListItemRenderer* chocobo, AtkComponentList* outerListListener, int idx)
+    unsafe void ClickChocobo(AddonChocoboBreedTraining* stablesAddon, int chocoboToFeed, int offsetInArray = 2)
     {
-        var owner = chocobo->OwnerNode;
-
-        var atkEvent = new AtkEvent()
+        var chocoboList = stablesAddon->GetNodeById(18);
+        if (chocoboList == null)
         {
-            Node = (AtkResNode*)outerListListener,
-            Target = (AtkEventTarget*)owner,
-            Listener = (AtkEventListener*)outerListListener,
-            Param = 0,
-            State = new AtkEventState
-            {
-                EventType = AtkEventType.ButtonClick,
-                StateFlags = AtkEventStateFlags.None,
-            }
-        };
-
-        var castedOwner = owner->GetAsAtkComponentButton();
-        if (castedOwner == null)
-        {
+            Log.Error($"stables list is null??");
             return;
         }
-        // TODO
+
+        var chocoboListComponent = chocoboList->GetAsAtkComponentList();
+        if (chocoboListComponent == null)
+        {
+            Log.Error($"chocoboListComponent component is null??");
+            return;
+        }
+
+        var target = (AtkEventTarget*)chocoboList;
+        var listener = (AtkEventListener*)stablesAddon;
+        if (listener == null)
+        {
+            Log.Error($"listener is null??");
+            return;
+        }
+
+        var syntheticListItemClick = stackalloc AtkEvent[1]
+        {
+            new AtkEvent()
+            {
+                Node = null, // OK
+                Target = target, // ListComponentNode OK
+                Listener = listener, // HousingChocoboList OK
+                Param = 3, // OK
+                NextEvent = null, // OK
+                State = new AtkEventState
+                {
+                    EventType = AtkEventType.ListItemClick, // OK
+                    StateFlags = AtkEventStateFlags.Unk3, // OK
+                }
+            }
+        };
+        var atkEventData = new AtkEventData()
+        {
+            ListItemData = new AtkEventData.AtkListItemData()
+            {
+                ListItemRenderer = (AtkComponentListItemRenderer*)chocoboListComponent->UldManager.NodeList[chocoboToFeed]->GetAsAtkComponentListItemRenderer(), 
+                ListItem = null,
+                SelectedIndex = chocoboToFeed - offsetInArray,
+                //UnkListField15C = 0, // this is private for some reason, but it's 0 anyways
+                HoveredItemIndex3 = (short)(chocoboToFeed - offsetInArray),
+                MouseButtonId = 0,
+                MouseModifier = AtkEventData.AtkMouseData.ModifierFlag.None
+            }
+        };
+        var eventData = stackalloc AtkEventData[1] { atkEventData };
+
+        syntheticClickFired = true;
+        Log.Information($"isSelectedStablesListControlledByPlugin = true");
+        isSelectedStablesListControlledByPlugin = true;
+        stablesAddon->ReceiveEvent(AtkEventType.ListItemClick, 3, syntheticListItemClick, eventData);
+        syntheticClickFired = false;
     }
 
     private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
@@ -435,6 +493,7 @@ public sealed class Plugin : IDalamudPlugin
             Log.Error($"null stables list??");
             return;
         }
+        var stablesListComponent = stablesList->GetAsAtkComponentList();
 
         // only click if the list idx is different:
         var currentStablesListIdx = getSelectedStablesListIdx(stablesAddon);
@@ -463,6 +522,8 @@ public sealed class Plugin : IDalamudPlugin
             Log.Error($"cannot cast inner chocobo list??");
             return;
         }
+
+        bool anyChocoboFed = false;
 
         var allChocobos = innerChocoboListAsAtkComponentList->UldManager.NodeList;
         for (int i = 0; i < innerChocoboListAsAtkComponentList->UldManager.NodeListCount; ++i)
@@ -515,18 +576,37 @@ public sealed class Plugin : IDalamudPlugin
                 // idk what this is, don't touch it
                 continue;
             }
-            
+
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
-            if (!isCapped && isReady || chocoboNameTextNode->GetText() == "Varus") {
-                //Log.Information($"Want to feed Chocobo {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
+            if (!isCapped && isReady) {
+                Log.Information($"Want to feed Chocobo #{i} {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", i, chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
                 // the chocobo is not capped and ready, let's click it to start training
 
-                // ClickChocobo(currentChocobo, innerChocoboListAsAtkComponentList, i);
+                ClickChocobo(stablesAddon, i);
                 // this should open the inventory, leading us to the other callback.
                 isInventoryOpenThroughStables = true;
+                anyChocoboFed = true;
                 return;
             }
+        }
+
+        Log.Information($"currentListIdx: {currentStablesListIdx}", currentStablesListIdx);
+        Log.Information($"ListLength: {stablesListComponent->ListLength}", stablesListComponent->ListLength);
+        var nextPageIdx = currentStablesListIdx + 1;
+        if (anyChocoboFed == false)
+        {
+            if (nextPageIdx < stablesListComponent->ListLength)
+            {
+                // try the next page
+                syntheticStablesListClick(stablesAddon, nextPageIdx);
+            } else if (nextPageIdx == stablesListComponent->ListLength)
+            {
+                stablesAddon->Close(true);
+            }
+        } else
+        {
+            // continue feeding on this page through next sync
         }
     }
 
