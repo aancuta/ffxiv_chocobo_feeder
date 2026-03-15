@@ -703,9 +703,27 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnCommand(string command, string args)
     {
-        if (command.ToLower() != "/easystables") return;
+        if (command.ToLower() != "/easystables")
+        {
+            return;
+        }
+        if (args.IsNullOrEmpty())
+        {
+            isEnabled = !isEnabled;
+        }
+        string[] split = args.Split(' ');
 
-        isEnabled = !isEnabled;
+        string subcommand = split[0];
+        if (subcommand == "delayMs")
+        {
+            var parsed = int.Parse(split[1]);
+            if (parsed >= 0)
+            {
+                delayMs = parsed;
+            }
+        }
+
+        Log.Information(args);
         ChatGui.Print(this.isEnabled ? "Easy Stables: Enabled" : "Easy Stables: Disabled");
     }
    
