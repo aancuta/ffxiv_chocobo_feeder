@@ -433,13 +433,34 @@ public sealed class Plugin : IDalamudPlugin
                 var quantity = item->Quantity;
                 var ag = AgentInventoryContext.Instance();
                 // Open context menu -> see ContextMenuOpen
-                ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());
+                ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());  
+                var contextMenu = (AtkUnitBase*)Svc.GameGui.GetAddonByName("ContextMenu", 1).Address;
+                var contextMenuAddon = (AddonContextMenu*)contextMenu;
+                var contextAgent = AgentInventoryContext.Instance();
 
-                var addonAddress = args.Addon.Address;
+                int indexOfReward = -1;
+                var looper = 0;
+                // apparently we need to loop because "Reward" is not always at index 0...
+                foreach (var contextObj in contextAgent->EventParams)
+                {
+                    if (contextObj.Type == FFXIVClientStructs.FFXIV.Component.GUI.ValueType.String)
+                    {
+                        var label = MemoryHelper.ReadSeStringNullTerminated(new IntPtr(contextObj.String));
 
-                var contextMenuAddon = (AddonContextMenu*)addonAddress;
+                        if (label.TextValue == "Reward")
+                        {
+                            Log.Information($"Found Reward!");
+                            indexOfReward = looper;
+                        }
 
-                ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, true, 0, 0, 0, 0, 0);
+                        looper++;
+                    }
+                }
+
+                if (indexOfReward >= 0) {
+                    Log.Information($"Clioking Reward!");
+                    ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, true, 0, 0, 0, 0, 0);
+                }
 
                 this.resetTimers();
                 return;
