@@ -67,7 +67,6 @@ public sealed class Plugin : IDalamudPlugin
 
     private long timeToDoStuffInStables = 0;
     private long timeToDoStuffInInventory = 0;
-    private long timeToDoStuffInContextMenu = 0;
 
     internal IAddonLifecycle lifeCycle { get; init; }
     [PluginService] internal IChatGui ChatGui { get; private set; }
@@ -99,8 +98,6 @@ public sealed class Plugin : IDalamudPlugin
         // addonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "HousingChocoboList", PostEventHook);
 
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
-
-        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "ContextMenu", ContextMenuDraw);
     }
     public void Dispose()
     {
@@ -114,8 +111,6 @@ public sealed class Plugin : IDalamudPlugin
 
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
 
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "ContextMenu", ContextMenuDraw);
-
         CommandManager.RemoveHandler(CommandName);
     }
 
@@ -123,27 +118,6 @@ public sealed class Plugin : IDalamudPlugin
     {
         timeToDoStuffInStables = 0;
         timeToDoStuffInInventory = 0;
-        timeToDoStuffInContextMenu = 0;
-    }
-
-    private unsafe void ContextMenuDraw(AddonEvent type, AddonArgs args)
-    {
-        if (timeToDoStuffInContextMenu == 0)
-        {
-            timeToDoStuffInContextMenu = Environment.TickCount64 + delayMs;
-            return;
-        }
-        else if (Environment.TickCount64 < timeToDoStuffInContextMenu)
-        {
-            return;
-        }
-
-        var addonAddress = args.Addon.Address;
-
-        var contextMenuAddon = (AddonContextMenu*)addonAddress;
-
-        ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, true, 0, 0, 0, 0, 0);
-        this.resetTimers();
     }
 
     private unsafe void CheckIfStableIsClean(AddonEvent type, AddonArgs args)
@@ -460,6 +434,14 @@ public sealed class Plugin : IDalamudPlugin
                 var ag = AgentInventoryContext.Instance();
                 // Open context menu -> see ContextMenuOpen
                 ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());
+
+                var addonAddress = args.Addon.Address;
+
+                var contextMenuAddon = (AddonContextMenu*)addonAddress;
+
+                ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, true, 0, 0, 0, 0, 0);
+
+                this.resetTimers();
                 return;
             }
         }
