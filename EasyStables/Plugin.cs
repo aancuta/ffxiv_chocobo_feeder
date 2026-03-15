@@ -92,7 +92,7 @@ public sealed class Plugin : IDalamudPlugin
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
 
-        addonLifecycle.RegisterListener(AddonEvent.PreReceiveEvent, "HousingChocoboList", PreEventHook);
+        //addonLifecycle.RegisterListener(AddonEvent.PreReceiveEvent, "HousingChocoboList", PreEventHook);
         // addonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "HousingChocoboList", PostEventHook);
 
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
@@ -172,71 +172,71 @@ public sealed class Plugin : IDalamudPlugin
     //    }
     //}
 
-    private unsafe void LogGameEvent(AtkEvent* atkEvent)
-    {
-        PluginLog.Information($"""
-                Logging atkEvent: {((int)atkEvent).ToString("X")}
-            """);
+    //private unsafe void LogGameEvent(AtkEvent* atkEvent)
+    //{
+    //    PluginLog.Information($"""
+    //            Logging atkEvent: {((int)atkEvent).ToString("X")}
+    //        """);
 
-        PluginLog.Information($"""
-                atkEvent->Node->NodeId: {(atkEvent->Node == null ? "-" : atkEvent->Node->NodeId)}
-                atkEvent->Target: {((int)(atkEvent->Target)).ToString("X")},
-                atkEvent->Listener: {((int)(atkEvent->Listener)).ToString("X")},
-                atkEvent->Param: {atkEvent->Param}
-                atkEvent->NextEvent: {((int)(atkEvent->NextEvent)).ToString("X")},
-                atkEvent->StateEventType: {atkEvent->State.EventType}
-                atkEvent->StateFlags: {atkEvent->State.StateFlags}
-                """);
-        if (atkEvent->NextEvent != null)
-        {
-            LogGameEvent(atkEvent->NextEvent);
-        }
-    }
+    //    PluginLog.Information($"""
+    //            atkEvent->Node->NodeId: {(atkEvent->Node == null ? "-" : atkEvent->Node->NodeId)}
+    //            atkEvent->Target: {((int)(atkEvent->Target)).ToString("X")},
+    //            atkEvent->Listener: {((int)(atkEvent->Listener)).ToString("X")},
+    //            atkEvent->Param: {atkEvent->Param}
+    //            atkEvent->NextEvent: {((int)(atkEvent->NextEvent)).ToString("X")},
+    //            atkEvent->StateEventType: {atkEvent->State.EventType}
+    //            atkEvent->StateFlags: {atkEvent->State.StateFlags}
+    //            """);
+    //    if (atkEvent->NextEvent != null)
+    //    {
+    //        LogGameEvent(atkEvent->NextEvent);
+    //    }
+    //}
 
-    private unsafe void PreEventHook(AddonEvent type, AddonArgs args)
-    {
-        if (args is AddonReceiveEventArgs evt)
-        {
-            var atkEvent = (AtkEvent*)evt.AtkEvent;
+    //private unsafe void PreEventHook(AddonEvent type, AddonArgs args)
+    //{
+    //    if (args is AddonReceiveEventArgs evt)
+    //    {
+    //        var atkEvent = (AtkEvent*)evt.AtkEvent;
 
-            var addonAddress = args.Addon.Address;
+    //        var addonAddress = args.Addon.Address;
 
-            var stablesAddon = (AddonChocoboBreedTraining*)addonAddress;
+    //        var stablesAddon = (AddonChocoboBreedTraining*)addonAddress;
 
-            var stablesList = stablesAddon->GetNodeById(3);
-            if (stablesList == null)
-            {
-                Log.Error($"stables list is null??");
-                return;
-            }
-            if (evt.AtkEventType != (byte)AtkEventType.ListItemClick)
-            {
-                return;
-            }
-            var target = (AtkEventTarget*)stablesList;
-            var data = MemoryHelper.ReadRaw(evt.AtkEventData, 40);
-            PluginLog.Information($"""
-                atkEvent->Node->NodeId: {(atkEvent->Node == null ? "-" : atkEvent->Node->NodeId)}
-                atkEvent->Target: {((int)(atkEvent->Target)).ToString("X")},
-                atkEvent->Listener: {((int)(atkEvent->Listener)).ToString("X")},
-                atkEvent->Param: {atkEvent->Param}
-                atkEvent->NextEvent: {((int)(atkEvent->NextEvent)).ToString("X")},
-                AtkEventType: {evt.AtkEventType}
-                atkEvent->StateEventType: {atkEvent->State.EventType}
-                atkEvent->StateFlags: {atkEvent->State.StateFlags}
-                data: {data.ToHexString()}
-                CursorTarget: {(stablesAddon->CursorTarget == null ? "-" : stablesAddon->CursorTarget->NodeId)}
-                """);
-            //LogGameEvent(atkEvent);
-            PluginLog.Information($"""
-                atkEventData->ListItemRenderer: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItemRenderer).ToString("X")}  
-                atkEventData->ListItem: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItem).ToString("X")}
-                atkEventData->SelectedIndex: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->HoveredItemIndex3)}
-                atkEventData->MouseButtonId: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseButtonId)}
-                atkEventData->MouseModifier: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseModifier)}
-                """);
-        }
-    }
+    //        var stablesList = stablesAddon->GetNodeById(3);
+    //        if (stablesList == null)
+    //        {
+    //            Log.Error($"stables list is null??");
+    //            return;
+    //        }
+    //        if (evt.AtkEventType != (byte)AtkEventType.ListItemClick)
+    //        {
+    //            return;
+    //        }
+    //        var target = (AtkEventTarget*)stablesList;
+    //        var data = MemoryHelper.ReadRaw(evt.AtkEventData, 40);
+    //        PluginLog.Information($"""
+    //            atkEvent->Node->NodeId: {(atkEvent->Node == null ? "-" : atkEvent->Node->NodeId)}
+    //            atkEvent->Target: {((int)(atkEvent->Target)).ToString("X")},
+    //            atkEvent->Listener: {((int)(atkEvent->Listener)).ToString("X")},
+    //            atkEvent->Param: {atkEvent->Param}
+    //            atkEvent->NextEvent: {((int)(atkEvent->NextEvent)).ToString("X")},
+    //            AtkEventType: {evt.AtkEventType}
+    //            atkEvent->StateEventType: {atkEvent->State.EventType}
+    //            atkEvent->StateFlags: {atkEvent->State.StateFlags}
+    //            data: {data.ToHexString()}
+    //            CursorTarget: {(stablesAddon->CursorTarget == null ? "-" : stablesAddon->CursorTarget->NodeId)}
+    //            """);
+    //        //LogGameEvent(atkEvent);
+    //        PluginLog.Information($"""
+    //            atkEventData->ListItemRenderer: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItemRenderer).ToString("X")}  
+    //            atkEventData->ListItem: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItem).ToString("X")}
+    //            atkEventData->SelectedIndex: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->HoveredItemIndex3)}
+    //            atkEventData->MouseButtonId: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseButtonId)}
+    //            atkEventData->MouseModifier: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseModifier)}
+    //            """);
+    //    }
+    //}
 
     public unsafe void syntheticStablesListClick(AddonChocoboBreedTraining* addon, int stablesListToSelect)
     {
@@ -307,9 +307,11 @@ public sealed class Plugin : IDalamudPlugin
         ECommonsMain.Dispose();
         lifeCycle.UnregisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
         lifeCycle.UnregisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
-
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
+
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+
+        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
 
         CommandManager.RemoveHandler(CommandName);
     }
