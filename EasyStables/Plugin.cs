@@ -240,7 +240,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public unsafe void syntheticStablesListClick(AddonChocoboBreedTraining* addon, int stablesListToSelect)
     {
-        Log.Information($"syntheticStablesListClick ${stablesListToSelect}", stablesListToSelect);
+        // Log.Information($"syntheticStablesListClick ${stablesListToSelect}", stablesListToSelect); 
         var stablesList = addon->GetNodeById(3);
         if (stablesList == null)
         {
