@@ -63,7 +63,7 @@ public sealed class Plugin : IDalamudPlugin
     private bool syntheticClickFired = false;
     private bool isStablesConditionGood = true;
 
-    private long delayMs = 2000;
+    private long delayMs = 1000;
 
     private long timeToDoStuff = 0;
 
@@ -91,7 +91,7 @@ public sealed class Plugin : IDalamudPlugin
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
 
-        addonLifecycle.RegisterListener(AddonEvent.PreReceiveEvent, "HousingChocoboList", PreEventHook);
+        // addonLifecycle.RegisterListener(AddonEvent.PreReceiveEvent, "HousingChocoboList", PreEventHook);
         // addonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "HousingChocoboList", PostEventHook);
 
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
@@ -122,7 +122,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
         var cSharpString = new String(cString);
-        if (cSharpString.Contains("Stable Cleanliness: Good") == false)
+        if (cSharpString.Contains("Stable Cleanliness") && cSharpString.Contains("Stable Cleanliness: Good") == false)
         {
             ByteColor red = new ByteColor();
             red.A = 255;
@@ -192,50 +192,50 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    private unsafe void PreEventHook(AddonEvent type, AddonArgs args)
-    {
-        if (args is AddonReceiveEventArgs evt)
-        {
-            var atkEvent = (AtkEvent*)evt.AtkEvent;
+    //private unsafe void PreEventHook(AddonEvent type, AddonArgs args)
+    //{
+    //    if (args is AddonReceiveEventArgs evt)
+    //    {
+    //        var atkEvent = (AtkEvent*)evt.AtkEvent;
 
-            var addonAddress = args.Addon.Address;
+    //        var addonAddress = args.Addon.Address;
 
-            var stablesAddon = (AddonChocoboBreedTraining*)addonAddress;
+    //        var stablesAddon = (AddonChocoboBreedTraining*)addonAddress;
 
-            var stablesList = stablesAddon->GetNodeById(3);
-            if (stablesList == null)
-            {
-                Log.Error($"stables list is null??");
-                return;
-            }
-            if (evt.AtkEventType != (byte)AtkEventType.ListItemClick)
-            {
-                return;
-            }
-            var target = (AtkEventTarget*)stablesList;
-            var data = MemoryHelper.ReadRaw(evt.AtkEventData, 40);
-            PluginLog.Information($"""
-                atkEvent->Node->NodeId: {(atkEvent->Node == null ? "-" : atkEvent->Node->NodeId)}
-                atkEvent->Target: {((int)(atkEvent->Target)).ToString("X")},
-                atkEvent->Listener: {((int)(atkEvent->Listener)).ToString("X")},
-                atkEvent->Param: {atkEvent->Param}
-                atkEvent->NextEvent: {((int)(atkEvent->NextEvent)).ToString("X")},
-                AtkEventType: {evt.AtkEventType}
-                atkEvent->StateEventType: {atkEvent->State.EventType}
-                atkEvent->StateFlags: {atkEvent->State.StateFlags}
-                data: {data.ToHexString()}
-                CursorTarget: {(stablesAddon->CursorTarget == null ? "-" : stablesAddon->CursorTarget->NodeId)}
-                """);
-            LogGameEvent(atkEvent);
-            PluginLog.Information($"""
-                atkEventData->ListItemRenderer: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItemRenderer).ToString("X")}  
-                atkEventData->ListItem: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItem).ToString("X")}
-                atkEventData->SelectedIndex: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->HoveredItemIndex3)}
-                atkEventData->MouseButtonId: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseButtonId)}
-                atkEventData->MouseModifier: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseModifier)}
-                """);
-        }
-    }
+    //        var stablesList = stablesAddon->GetNodeById(3);
+    //        if (stablesList == null)
+    //        {
+    //            Log.Error($"stables list is null??");
+    //            return;
+    //        }
+    //        if (evt.AtkEventType != (byte)AtkEventType.ListItemClick)
+    //        {
+    //            return;
+    //        }
+    //        var target = (AtkEventTarget*)stablesList;
+    //        var data = MemoryHelper.ReadRaw(evt.AtkEventData, 40);
+    //        PluginLog.Information($"""
+    //            atkEvent->Node->NodeId: {(atkEvent->Node == null ? "-" : atkEvent->Node->NodeId)}
+    //            atkEvent->Target: {((int)(atkEvent->Target)).ToString("X")},
+    //            atkEvent->Listener: {((int)(atkEvent->Listener)).ToString("X")},
+    //            atkEvent->Param: {atkEvent->Param}
+    //            atkEvent->NextEvent: {((int)(atkEvent->NextEvent)).ToString("X")},
+    //            AtkEventType: {evt.AtkEventType}
+    //            atkEvent->StateEventType: {atkEvent->State.EventType}
+    //            atkEvent->StateFlags: {atkEvent->State.StateFlags}
+    //            data: {data.ToHexString()}
+    //            CursorTarget: {(stablesAddon->CursorTarget == null ? "-" : stablesAddon->CursorTarget->NodeId)}
+    //            """);
+    //        LogGameEvent(atkEvent);
+    //        PluginLog.Information($"""
+    //            atkEventData->ListItemRenderer: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItemRenderer).ToString("X")}  
+    //            atkEventData->ListItem: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->ListItem).ToString("X")}
+    //            atkEventData->SelectedIndex: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->HoveredItemIndex3)}
+    //            atkEventData->MouseButtonId: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseButtonId)}
+    //            atkEventData->MouseModifier: {((int)(((AtkEventData.AtkListItemData*)evt.AtkEventData))->MouseModifier)}
+    //            """);
+    //    }
+    //}
 
     public unsafe void syntheticStablesListClick(AddonChocoboBreedTraining* addon, int stablesListToSelect)
     {
@@ -379,15 +379,6 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        var addonAddress = args.Addon.Address;
-
-        var stablesAddon = (AddonChocoboBreedTraining*)addonAddress; // has ID 1
-        if (stablesAddon == null)
-        {
-            Log.Information("null addon??");
-            return;
-        }
-
         // inspired by artisan: https://github.com/PunishXIV/Artisan/blob/9eb581257f96186c42b6652599c1ab40a501a3f0/Artisan/Tasks/TaskSelectRetainer.cs#L260
         var inventories = new List<InventoryType>
         {
@@ -501,7 +492,11 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (!args.Addon.IsVisible || !args.Addon.IsReady) return;
+        if (!args.Addon.IsVisible || !args.Addon.IsReady)
+        {
+            timeToDoStuff = 0;
+            return;
+        }
 
         if (!isEnabled)
         {
@@ -510,10 +505,11 @@ public sealed class Plugin : IDalamudPlugin
 
         var addonAddress = args.Addon.Address;
 
-        var stablesAddon = (AddonChocoboBreedTraining*)addonAddress; // has ID 1 
+        var stablesAddon = (AddonChocoboBreedTraining*)addonAddress; // has ID 1
         if (stablesAddon == null || !stablesAddon->IsFullyLoaded())
         {
             Log.Error("$null addon??");
+            timeToDoStuff = 0;
             return;
         }
 
@@ -612,14 +608,19 @@ public sealed class Plugin : IDalamudPlugin
 
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
-            Log.Information($"Want to feed Chocobo #{i} {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", i, chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
 
-            if (!isCapped && isReady) {
-                // the chocobo is not capped and ready, let's click it to start training
+            if (i > 2 && !isCapped && isReady) {
+                // the chocobo is not capped and ready, let's click it to start training:
+                Log.Information($"Want to feed Chocobo #{i} {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", i, chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
 
-                ClickChocobo(stablesAddon, i);
                 // this should open the inventory, leading us to the other callback.
+                ClickChocobo(stablesAddon, i);
+
+                // delay next op:
+                timeToDoStuff = 0;
+
                 stablesOpen = true;
+                // we need to check this page again at next sync:
                 anyChocoboFed = true;
                 return;
             }
@@ -630,8 +631,8 @@ public sealed class Plugin : IDalamudPlugin
             Log.Error($"cannot fetch selected stables index??");
             return;
         }
-        Log.Information($"currentListIdx: {currentStablesListIdx}", currentStablesListIdx);
-        Log.Information($"ListLength: {stablesListComponent->ListLength}", stablesListComponent->ListLength);
+        //Log.Information($"currentListIdx: {currentStablesListIdx}", currentStablesListIdx);
+        //Log.Information($"ListLength: {stablesListComponent->ListLength}", stablesListComponent->ListLength);
         var nextPageIdx = currentStablesListIdx + 1;
         if (anyChocoboFed == false)
         {
@@ -639,13 +640,15 @@ public sealed class Plugin : IDalamudPlugin
             {
                 // try the next page through next sync
                 currentPageIdx = nextPageIdx;
+                timeToDoStuff = 0;
             } else if (nextPageIdx == stablesListComponent->ListLength)
             {
                 Log.Information($"Nothing left to feed, closing window");
-                stablesAddon->Close(true);
+                // reset state before closing:
+                setSelectedStablesListIdx(stablesAddon, 0);
                 currentPageIdx = 0;
                 timeToDoStuff = 0;
-                setSelectedStablesListIdx(stablesAddon, 0);
+                stablesAddon->Close(true);
             }
         } else
         {
