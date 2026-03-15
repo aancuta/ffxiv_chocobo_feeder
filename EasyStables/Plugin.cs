@@ -67,6 +67,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private long timeToDoStuffInStables = 0;
     private long timeToDoStuffInInventory = 0;
+    private long timeToDoStuffInContextMenu = 0;
 
     internal IAddonLifecycle lifeCycle { get; init; }
     [PluginService] internal IChatGui ChatGui { get; private set; }
@@ -84,6 +85,8 @@ public sealed class Plugin : IDalamudPlugin
 
         // Use /xllog to open the log window in-game
 
+        resetTimers();
+
         addonLifecycle.RegisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
 
         // addonLifecycle.RegisterListener(AddonEvent.PreClose, "HousingChocoboList", HookStablesPreClose);
@@ -96,6 +99,51 @@ public sealed class Plugin : IDalamudPlugin
         // addonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "HousingChocoboList", PostEventHook);
 
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
+
+        addonLifecycle.RegisterListener(AddonEvent.PostOpen, "ContextMenu", ContextMenuOpen);
+    }
+    public void Dispose()
+    {
+        isEnabled = false;
+        ECommonsMain.Dispose();
+        lifeCycle.UnregisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
+        lifeCycle.UnregisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
+        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
+         
+        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+
+        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
+
+        lifeCycle.UnregisterListener(AddonEvent.PostOpen, "ContextMenu", ContextMenuOpen);
+
+        CommandManager.RemoveHandler(CommandName);
+    }
+
+    private void resetTimers()
+    {
+        timeToDoStuffInStables = 0;
+        timeToDoStuffInInventory = 0;
+        timeToDoStuffInContextMenu = 0;
+    }
+
+    private unsafe void ContextMenuOpen(AddonEvent type, AddonArgs args)
+    {
+        if (timeToDoStuffInContextMenu == 0)
+        {
+            timeToDoStuffInContextMenu = Environment.TickCount64 + delayMs;
+            return;
+        }
+        else if (Environment.TickCount64 < timeToDoStuffInContextMenu)
+        {
+            return;
+        }
+
+        var addonAddress = args.Addon.Address;
+
+        var contextMenuAddon = (AddonContextMenu*)addonAddress;
+
+        ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, true, 0, 0, 0, 0, 0);
+        this.resetTimers();
     }
 
     private unsafe void CheckIfStableIsClean(AddonEvent type, AddonArgs args)
@@ -298,22 +346,8 @@ public sealed class Plugin : IDalamudPlugin
         addon->ReceiveEvent(eventType, 2, syntheticEvent, eventData);
         setSelectedStablesListIdx(addon, stablesListToSelect); // need to set this manually; UI still does not update properly. but this works
         syntheticClickFired = false;
-        timeToDoStuffInStables = 0;
-    }
 
-    public void Dispose()
-    {
-        isEnabled = false;
-        ECommonsMain.Dispose();
-        lifeCycle.UnregisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
-        lifeCycle.UnregisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
-
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
-
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
-
-        CommandManager.RemoveHandler(CommandName);
+        this.resetTimers();
     }
 
     private void HookStablesClose(AddonEvent type, AddonArgs args)
@@ -326,6 +360,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         // this is called in between feeding chocobos!
         stablesOpen = true;
+        resetTimers();
     }
 
     private unsafe bool IsChocoboCapped(AtkTextNode* rank)
@@ -423,12 +458,8 @@ public sealed class Plugin : IDalamudPlugin
 
                 var quantity = item->Quantity;
                 var ag = AgentInventoryContext.Instance();
+                // Open context menu -> see ContextMenuOpen
                 ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());
-                var contextMenu = (AtkUnitBase*)Svc.GameGui.GetAddonByName("ContextMenu", 1).Address;
-
-                ECommons.Automation.Callback.Fire(contextMenu, true, 0, 0, 0, 0, 0);
-                timeToDoStuffInStables = 0;
-                timeToDoStuffInInventory = 0;
                 return;
             }
         }
@@ -492,7 +523,8 @@ public sealed class Plugin : IDalamudPlugin
         syntheticClickFired = true;
         stablesAddon->ReceiveEvent(AtkEventType.ListItemClick, 3, syntheticListItemClick, eventData);
         syntheticClickFired = false;
-        timeToDoStuffInStables = 0;
+
+        this.resetTimers();
     }
 
     private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
@@ -508,7 +540,7 @@ public sealed class Plugin : IDalamudPlugin
 
         if (!args.Addon.IsVisible || !args.Addon.IsReady)
         {
-            timeToDoStuffInStables = 0;
+            this.resetTimers();
             return;
         }
 
@@ -631,7 +663,7 @@ public sealed class Plugin : IDalamudPlugin
                 ClickChocobo(stablesAddon, i);
 
                 // delay next op:
-                timeToDoStuffInStables = 0;
+                this.resetTimers();
 
                 stablesOpen = true;
                 // we need to check this page again at next sync:
@@ -654,14 +686,13 @@ public sealed class Plugin : IDalamudPlugin
             {
                 // try the next page through next sync
                 currentPageIdx = nextPageIdx;
-                timeToDoStuffInStables = 0;
+                this.resetTimers();
             } else if (nextPageIdx == stablesListComponent->ListLength)
             {
                 Log.Information($"Nothing left to feed, closing window");
                 // reset state before closing:
                 setSelectedStablesListIdx(stablesAddon, 0);
-                currentPageIdx = 0;
-                timeToDoStuffInStables = 0;
+                this.resetTimers();
                 stablesAddon->Close(true);
             }
         } else
