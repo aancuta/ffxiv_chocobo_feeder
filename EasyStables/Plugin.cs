@@ -47,7 +47,8 @@ public sealed class Plugin : IDalamudPlugin
 
     public string Name => "EasyStables";
 
-    private const string CommandName = "/easystables";
+    private const string MainCommandName = "/easystables";
+    private const string SubCommandName = "/easystables delay [milliseconds]";
 
     public Configuration Configuration { get; init; }
 
@@ -60,7 +61,6 @@ public sealed class Plugin : IDalamudPlugin
     private int currentPageIdx = 0;
 
     /* whether a synthetic click was automatically fired by the plugin */
-    private bool syntheticClickFired = false;
     private bool isStablesConditionGood = true;
     private bool closeStablesAtNextTick = false;
 
@@ -68,6 +68,23 @@ public sealed class Plugin : IDalamudPlugin
 
     private long timeToDoStuffInStables = 0;
     private long timeToDoStuffInInventory = 0;
+    private long timeToDoStuffInStableCleanliness = 0;
+
+    private void resetStateToInitial()
+    {
+        stablesOpen = false;
+        currentPageIdx = 0;
+        isStablesConditionGood = true;
+        closeStablesAtNextTick = false;
+
+        resetTimers();
+    }
+    private void resetTimers()
+    {
+        timeToDoStuffInStables = 0;
+        timeToDoStuffInInventory = 0;
+        timeToDoStuffInStableCleanliness = 0;
+    }
 
     internal IAddonLifecycle lifeCycle { get; init; }
     [PluginService] internal IChatGui ChatGui { get; private set; }
@@ -78,9 +95,13 @@ public sealed class Plugin : IDalamudPlugin
         lifeCycle = addonLifecycle;
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
-        CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
+        CommandManager.AddHandler(MainCommandName, new CommandInfo(OnCommand)
         {
             HelpMessage = "Enable / Disable EasyStables"
+        });
+        CommandManager.AddHandler(SubCommandName, new CommandInfo(OnCommand)
+        {
+            HelpMessage = "Change delay between automatic actions"
         });
 
         // Use /xllog to open the log window in-game
@@ -112,18 +133,18 @@ public sealed class Plugin : IDalamudPlugin
 
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
 
-        CommandManager.RemoveHandler(CommandName);
-    }
-
-    private void resetTimers()
-    {
-        timeToDoStuffInStables = 0;
-        timeToDoStuffInInventory = 0;
+        CommandManager.RemoveHandler(MainCommandName);
+        CommandManager.RemoveHandler(SubCommandName);
     }
 
     private unsafe void CheckIfStableIsClean(AddonEvent type, AddonArgs args)
     {
         var addonAddress = args.Addon.Address;
+
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInStableCleanliness))
+        {
+            return;
+        }
 
         var stablesAddon = (AddonSelectString*)addonAddress;
         var textNode = stablesAddon->GetNodeById(2);
@@ -156,6 +177,8 @@ public sealed class Plugin : IDalamudPlugin
             castedTextNode->TextColor = red;
             isStablesConditionGood = false;
         }
+
+        resetStateToInitial();
     }
 
     //private unsafe void HookStablesPreClose(AddonEvent type, AddonArgs args)
@@ -317,10 +340,8 @@ public sealed class Plugin : IDalamudPlugin
             }
         };
         var eventData = stackalloc AtkEventData[1] { atkEventData };
-        syntheticClickFired = true;
         addon->ReceiveEvent(eventType, 2, syntheticEvent, eventData);
         setSelectedStablesListIdx(addon, stablesListToSelect); // need to set this manually; UI still does not update properly. but this works
-        syntheticClickFired = false;
 
         this.resetTimers();
     }
@@ -385,6 +406,20 @@ public sealed class Plugin : IDalamudPlugin
         component->SelectedItemIndex = selectedItemIndex;
     }
 
+    private bool timerNotReadyOrNeedsStart(ref long timer)
+    {
+        if (timer == 0)
+        {
+            timer = Environment.TickCount64 + delayMs;
+            return true;
+        }
+        else if (Environment.TickCount64 < timer)
+        {
+            return true;
+        }
+        return false;
+    }
+
     private unsafe void SearchInventoryForFood(AddonEvent type, AddonArgs args)
     {
         if (!isEnabled || !stablesOpen)
@@ -393,12 +428,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (timeToDoStuffInInventory == 0)
-        {
-            timeToDoStuffInInventory = Environment.TickCount64 + delayMs;
-            return;
-        }
-        else if (Environment.TickCount64 < timeToDoStuffInInventory)
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInInventory))
         {
             return;
         }
@@ -525,24 +555,13 @@ public sealed class Plugin : IDalamudPlugin
         };
         var eventData = stackalloc AtkEventData[1] { atkEventData };
 
-        syntheticClickFired = true;
         stablesAddon->ReceiveEvent(AtkEventType.ListItemClick, 3, syntheticListItemClick, eventData);
-        syntheticClickFired = false;
 
         this.resetTimers();
     }
 
     private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
     {
-        if (timeToDoStuffInStables == 0)
-        {
-            timeToDoStuffInStables = Environment.TickCount64 + delayMs;
-            return;
-        } else if (Environment.TickCount64 < timeToDoStuffInStables)
-        {
-            return;
-        }
-
         if (!args.Addon.IsVisible || !args.Addon.IsReady)
         {
             this.resetTimers();
@@ -550,6 +569,11 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         if (!isEnabled)
+        {
+            return;
+        }
+
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInStables))
         {
             return;
         }
@@ -667,7 +691,7 @@ public sealed class Plugin : IDalamudPlugin
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
 
-            if (!isCapped && isReady) {
+            if ((!isCapped && isReady)) {
                 // the chocobo is not capped and ready, let's click it to start training:
                 Log.Information($"Want to feed Chocobo #{i} {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", i, chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
 
@@ -726,7 +750,7 @@ public sealed class Plugin : IDalamudPlugin
         string[] split = args.Split(' ');
 
         string subcommand = split[0];
-        if (subcommand == "delayMs")
+        if (subcommand == "delay")
         {
             var parsed = int.Parse(split[1]);
             if (parsed >= 0)
@@ -735,8 +759,7 @@ public sealed class Plugin : IDalamudPlugin
             }
         }
 
-        Log.Information(args);
-        ChatGui.Print(this.isEnabled ? "Easy Stables: Enabled" : "Easy Stables: Disabled");
+        ChatGui.Print($"[Easy Stables] {(isEnabled ? "Enabled" : "Disabled")}");
+        ChatGui.Print($"[Easy Stables] Delay {delayMs}");
     }
-   
 }
