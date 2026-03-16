@@ -449,8 +449,8 @@ public sealed class Plugin : IDalamudPlugin
 
                         if (label.TextValue == "Reward")
                         {
-                            Log.Information($"Found Reward at {indexOfReward}!", indexOfReward);
                             indexOfReward = looper;
+                            Log.Information($"Found Reward at {indexOfReward}!", indexOfReward);
                         }
 
                         looper++;
