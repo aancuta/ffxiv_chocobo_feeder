@@ -62,6 +62,7 @@ public sealed class Plugin : IDalamudPlugin
     /* whether a synthetic click was automatically fired by the plugin */
     private bool syntheticClickFired = false;
     private bool isStablesConditionGood = true;
+    private bool closeStablesAtNextTick = false;
 
     private long delayMs = 1000;
 
@@ -328,6 +329,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         // this is called in between feeding chocobos!
         stablesOpen = false;
+        resetTimers();
     }
 
     private unsafe void HookStablesOpen(AddonEvent type, AddonArgs args)
@@ -562,6 +564,13 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (closeStablesAtNextTick == true)
+        {
+            stablesAddon->Close(true);
+            closeStablesAtNextTick = false;
+            return;
+        }
+
         if (isStablesConditionGood == false)
         {
 
@@ -668,10 +677,10 @@ public sealed class Plugin : IDalamudPlugin
                 // delay next op:
                 this.resetTimers();
 
-                stablesOpen = true;
                 // we need to check this page again at next sync:
+                // TODO: optimize this?
                 anyChocoboFed = true;
-                return; // TODO: optimize this?
+                return;
             }
         }
 
@@ -689,15 +698,15 @@ public sealed class Plugin : IDalamudPlugin
             {
                 // try the next page through next sync
                 currentPageIdx = nextPageIdx;
-                this.resetTimers();
             } else if (nextPageIdx == stablesListComponent->ListLength)
             {
                 Log.Information($"Nothing left to feed, closing window");
-                // reset state before closing:
-                setSelectedStablesListIdx(stablesAddon, 0);
-                this.resetTimers();
-                stablesAddon->Close(true);
+                // for some reason, the state does not reset when first opening the window next time, leading to a poisoned state.
+                // simulate a click to go to the first page in a more "orthodox" manner; note: no, setSelectedStablesListIdx does not work.
+                syntheticStablesListClick(stablesAddon, 0);
+                closeStablesAtNextTick = true;
             }
+            this.resetTimers();
         } else
         {
             // continue feeding on this page through next sync
