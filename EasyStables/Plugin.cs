@@ -459,7 +459,7 @@ public sealed class Plugin : IDalamudPlugin
 
                 if (indexOfReward >= 0) {
                     Log.Information($"Clioking Reward!");
-                    ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, true, 0, indexOfReward, 0, 0, 0);
+                    ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, false, 0, indexOfReward, 0, 0, 0);
                 }
 
                 this.resetTimers();
