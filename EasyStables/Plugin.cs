@@ -23,6 +23,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -64,11 +65,14 @@ public sealed class Plugin : IDalamudPlugin
     private bool isStablesConditionGood = true;
     private bool closeStablesAtNextTick = false;
 
-    private long delayMs = 1000;
+    private long delayMs = 750;
 
     private long timeToDoStuffInStables = 0;
     private long timeToDoStuffInInventory = 0;
     private long timeToDoStuffInStableCleanliness = 0;
+
+    private HashSet<string> fedChocobos = new HashSet<string>();
+    private HashSet<string> cappedChocobos = new HashSet<string>();
 
     private void resetStateToInitial()
     {
@@ -76,6 +80,9 @@ public sealed class Plugin : IDalamudPlugin
         currentPageIdx = 0;
         isStablesConditionGood = true;
         closeStablesAtNextTick = false;
+
+        fedChocobos.Clear();
+        cappedChocobos.Clear();
 
         resetTimers();
     }
@@ -176,6 +183,14 @@ public sealed class Plugin : IDalamudPlugin
             red.B = 0;
             castedTextNode->TextColor = red;
             isStablesConditionGood = false;
+        }
+
+        foreach (var chocoboId in fedChocobos)
+        {
+            if (cappedChocobos.Contains(chocoboId))
+            {
+                ChatGui.Print($"[Easy Stables] Capped chocobo: {chocoboId}");
+            }
         }
 
         resetStateToInitial();
@@ -691,12 +706,21 @@ public sealed class Plugin : IDalamudPlugin
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
 
+            string chocoboIdentifier = $"{chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()}";
+
+            if (isCapped)
+            {
+                cappedChocobos.Add(chocoboIdentifier);
+            }
+
             if ((!isCapped && isReady)) {
                 // the chocobo is not capped and ready, let's click it to start training:
-                Log.Information($"Want to feed Chocobo #{i} {chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()} capped: {isCapped} ready in: {trainingTextNode->GetText()}", i, chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
+                Log.Information($"Want to feed Chocobo #{i} {chocoboIdentifier} capped: {isCapped} ready in: {trainingTextNode->GetText()}", i, chocoboNameTextNode->GetText(), chocoboOwnerTextNode->GetText(), trainingTextNode->GetText());
 
                 // this should open the inventory, leading us to the other callback.
                 ClickChocobo(stablesAddon, i);
+
+                fedChocobos.Add(chocoboIdentifier);
 
                 // delay next op:
                 this.resetTimers();
