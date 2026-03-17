@@ -185,12 +185,10 @@ public sealed class Plugin : IDalamudPlugin
             isStablesConditionGood = false;
         }
 
-        foreach (var chocoboId in fedChocobos)
+        var fedChocobosThatCapped = fedChocobos.Intersect(cappedChocobos);
+        foreach (var cappedFedChocobo in fedChocobosThatCapped)
         {
-            if (cappedChocobos.Contains(chocoboId))
-            {
-                ChatGui.Print($"[Easy Stables] Capped chocobo: {chocoboId}");
-            }
+            ChatGui.Print($"[Easy Stables] Capped chocobo: {cappedFedChocobo}");
         }
 
         resetStateToInitial();
