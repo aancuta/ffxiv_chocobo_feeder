@@ -122,6 +122,7 @@ public sealed class Plugin : IDalamudPlugin
 
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
         addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid3E", SearchInventoryForFood); // support full inventory
 
         //addonLifecycle.RegisterListener(AddonEvent.PreReceiveEvent, "HousingChocoboList", PreEventHook);
         // addonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "HousingChocoboList", PostEventHook);
@@ -137,6 +138,7 @@ public sealed class Plugin : IDalamudPlugin
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
          
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid3E", SearchInventoryForFood);
 
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
 
@@ -495,7 +497,6 @@ public sealed class Plugin : IDalamudPlugin
                         if (label.TextValue == "Reward")
                         {
                             indexOfReward = looper;
-                            Log.Information($"Found Reward at {indexOfReward}!", indexOfReward);
                         }
 
                         looper++;
