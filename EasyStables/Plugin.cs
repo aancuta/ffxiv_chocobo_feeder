@@ -74,6 +74,8 @@ public sealed class Plugin : IDalamudPlugin
     private HashSet<string> fedChocobos = new HashSet<string>();
     private HashSet<string> cappedChocobos = new HashSet<string>();
 
+    private Dictionary<string, string> chocoboRanks = new Dictionary<string, string>();
+
     private void resetStateToInitial()
     {
         stablesOpen = false;
@@ -83,6 +85,7 @@ public sealed class Plugin : IDalamudPlugin
 
         fedChocobos.Clear();
         cappedChocobos.Clear();
+        chocoboRanks.Clear();
 
         resetTimers();
     }
@@ -170,12 +173,12 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         var cString = castedTextNode->GetText();
-        if (cString == null)
+        if (!cString.HasValue)
         {
             Log.Error($"null cString??");
             return;
         }
-        var cSharpString = new String(cString);
+        var cSharpString = cString.ToString();
         if (cSharpString.Contains("Stable Cleanliness") && cSharpString.Contains("Stable Cleanliness: Good") == false)
         {
             ByteColor red = new ByteColor();
@@ -190,7 +193,8 @@ public sealed class Plugin : IDalamudPlugin
         var fedChocobosThatCapped = fedChocobos.Intersect(cappedChocobos);
         foreach (var cappedFedChocobo in fedChocobosThatCapped)
         {
-            ChatGui.Print($"[Easy Stables] Capped chocobo: {cappedFedChocobo}");
+            string rank = chocoboRanks.GetValueOrDefault(cappedFedChocobo, "N/A");
+            ChatGui.Print($"[Easy Stables] birbcapped: {cappedFedChocobo} on rank {rank}");
         }
 
         resetStateToInitial();
@@ -351,7 +355,7 @@ public sealed class Plugin : IDalamudPlugin
                 //UnkListField15C = 0, // this is private for some reason, but it's 0 anyways
                 HoveredItemIndex3 = (short)stablesListToSelect,
                 MouseButtonId = 0,
-                MouseModifier = AtkEventData.AtkMouseData.ModifierFlag.None
+                MouseModifier = FFXIVClientStructs.FFXIV.Component.GUI.ModifierFlag.None
             }
         };
         var eventData = stackalloc AtkEventData[1] { atkEventData };
@@ -384,7 +388,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe bool IsChocoboReady(AtkTextNode* training)
     {
-        return training->GetText() == "Ready";
+        return training->GetText().Equals("Ready");
     }
 
     private unsafe int getSelectedStablesListIdx(AddonChocoboBreedTraining* addon)
@@ -490,7 +494,7 @@ public sealed class Plugin : IDalamudPlugin
                 // apparently we need to loop because "Reward" is not always at index 0...
                 foreach (var contextObj in contextAgent->EventParams)
                 {
-                    if (contextObj.Type == FFXIVClientStructs.FFXIV.Component.GUI.ValueType.String)
+                    if (contextObj.Type == FFXIVClientStructs.FFXIV.Component.GUI.AtkValueType.String)
                     {
                         var label = MemoryHelper.ReadSeStringNullTerminated(new IntPtr(contextObj.String));
 
@@ -564,7 +568,7 @@ public sealed class Plugin : IDalamudPlugin
                 //UnkListField15C = 0, // this is private for some reason, but it's 0 anyways
                 HoveredItemIndex3 = (short)(chocoboToFeed - offsetInArray),
                 MouseButtonId = 0,
-                MouseModifier = AtkEventData.AtkMouseData.ModifierFlag.None
+                MouseModifier = FFXIVClientStructs.FFXIV.Component.GUI.ModifierFlag.None
             }
         };
         var eventData = stackalloc AtkEventData[1] { atkEventData };
@@ -696,7 +700,7 @@ public sealed class Plugin : IDalamudPlugin
             var chocoboRankTextNode = chocoboRankRaw->GetAsAtkTextNode();
             var trainingTextNode = trainingRaw->GetAsAtkTextNode();
 
-            if (chocoboNameTextNode->GetText() == "" && chocoboOwnerTextNode->GetText() == "")
+            if (chocoboNameTextNode->GetText().Equals("") && chocoboOwnerTextNode->GetText().Equals(""))
             {
                 // idk what this is, don't touch it
                 continue;
@@ -711,6 +715,7 @@ public sealed class Plugin : IDalamudPlugin
             {
                 cappedChocobos.Add(chocoboIdentifier);
             }
+            chocoboRanks[chocoboIdentifier] = chocoboRankTextNode->GetText().ToString();
 
             if ((!isCapped && isReady)) {
                 // the chocobo is not capped and ready, let's click it to start training:
