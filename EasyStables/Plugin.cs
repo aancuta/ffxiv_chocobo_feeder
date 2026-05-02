@@ -9,13 +9,6 @@ using Dalamud.IoC;
 using Dalamud.Memory;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using ECommons;
-using ECommons.Automation;
-using ECommons.Automation.UIInput;
-using ECommons.DalamudServices;
-using ECommons.Gamepad;
-using ECommons.Logging;
-using ECommons.UIHelpers.AddonMasterImplementations;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
 using FFXIVClientStructs.FFXIV.Client.System.Input;
@@ -30,10 +23,8 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
-using static ECommons.UIHelpers.AddonMasterImplementations.AddonMaster;
 using static FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.VertexShader;
 using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
-using Module = ECommons.Module;
 namespace EasyStables;
 
 public sealed class Plugin : IDalamudPlugin
@@ -97,11 +88,10 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     internal IAddonLifecycle lifeCycle { get; init; }
-    [PluginService] internal IChatGui ChatGui { get; private set; }
+    [PluginService] internal IChatGui ChatGui { get; private set; } 
 
     public Plugin(IDalamudPluginInterface dalamud, ICommandManager commmandManager, IPluginLog log, INotificationManager notificationManager, IAddonLifecycle addonLifecycle)
     {
-        ECommonsMain.Init(dalamud, this, Module.All);
         lifeCycle = addonLifecycle;
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
@@ -135,7 +125,6 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         isEnabled = false;
-        ECommonsMain.Dispose();
         lifeCycle.UnregisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
         lifeCycle.UnregisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
         lifeCycle.UnregisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
@@ -388,7 +377,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe bool IsChocoboReady(AtkTextNode* training)
     {
-        return training->GetText().Equals("Ready");
+        return training->GetText().ToString().Equals("Ready");
     }
 
     private unsafe int getSelectedStablesListIdx(AddonChocoboBreedTraining* addon)
@@ -476,7 +465,7 @@ public sealed class Plugin : IDalamudPlugin
                 {
                     continue;
                 }
-                if (item->GetItemId() != 8165) // Krakka root
+                if (item->GetItemId() != 8165) // Krakka root 
                 {
                     continue;
                 }
@@ -484,9 +473,9 @@ public sealed class Plugin : IDalamudPlugin
                 var quantity = item->Quantity;
                 var ag = AgentInventoryContext.Instance();
                 // Open context menu -> see ContextMenuOpen
-                ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());  
-                var contextMenu = (AtkUnitBase*)Svc.GameGui.GetAddonByName("ContextMenu", 1).Address;
-                var contextMenuAddon = (AddonContextMenu*)contextMenu;
+                ag->OpenForItemSlot(inv, i, 0, AgentModule.Instance()->GetAgentByInternalId(AgentId.Inventory)->GetAddonId());
+                var contextMenu = RaptureAtkUnitManager.Instance()->GetAddonByName("ContextMenu");
+                var contextMenuAddon = (AddonContextMenu*)contextMenu; 
                 var contextAgent = AgentInventoryContext.Instance();
 
                 int indexOfReward = -1;
@@ -508,8 +497,14 @@ public sealed class Plugin : IDalamudPlugin
                 }
 
                 if (indexOfReward >= 0) {
-                    Log.Information($"Clioking Reward!");
-                    ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, false, 0, indexOfReward, 0, 0, 0);
+                    Log.Information($"Clicking Reward!");
+                    AtkValue* param = stackalloc AtkValue[5];
+                    for(int j = 0; j < 5; j++)
+                    {
+                        param[j].Type = AtkValueType.Int;
+                    }
+                    param[3].Int = looper;
+                    contextMenuAddon->FireCallback(5, param);
                 }
 
                 this.resetTimers();
@@ -700,7 +695,7 @@ public sealed class Plugin : IDalamudPlugin
             var chocoboRankTextNode = chocoboRankRaw->GetAsAtkTextNode();
             var trainingTextNode = trainingRaw->GetAsAtkTextNode();
 
-            if (chocoboNameTextNode->GetText().Equals("") && chocoboOwnerTextNode->GetText().Equals(""))
+            if (chocoboNameTextNode->GetText().ToString().Equals("") && chocoboOwnerTextNode->GetText().ToString().Equals(""))
             {
                 // idk what this is, don't touch it
                 continue;
@@ -771,7 +766,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             return;
         }
-        if (args.IsNullOrEmpty())
+        if (string.IsNullOrEmpty(args))
         {
             isEnabled = !isEnabled;
         }
