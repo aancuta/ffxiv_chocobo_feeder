@@ -7,12 +7,8 @@
       <Tags>Stables,Bird,Chocobo</Tags>
       <Author>Black Bird</Author>
       <IconUrl>https://github.com/aancuta/ffxiv_chocobo_feeder/releases/download/1.1.1/chocobo_square.png</IconUrl>
-      <Version>1.2.1.0</Version>
+      <Version>1.2.2.0</Version>
       <RootNamespace>EasyStables</RootNamespace>
       <Copyright>MIT</Copyright>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\ECommons\ECommons\ECommons.csproj" />
-  </ItemGroup>
 </Project>
