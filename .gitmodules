@@ -1,9 +1,6 @@
 [submodule "ClickLib"]
 	path = ClickLib
 	url = https://github.com/Limiana/ClickLib
-[submodule "ECommons"]
-	path = ECommons
-	url = https://github.com/NightmareXIV/ECommons
 [submodule "ViGEmBus"]
 	path = ViGEmBus
 	url = https://github.com/nefarius/ViGEmBus
