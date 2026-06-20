@@ -30,6 +30,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
+using static ECommons.UIHelpers.AddonMasterImplementations.AddonMaster;
 using static FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.VertexShader;
 using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
 namespace EasyStables;
@@ -53,7 +54,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public readonly WindowSystem WindowSystem = new("EasyStables");
 
-    private bool isEnabled = true;
+    private bool isEnabled = false;
 
     /* only manages whether the inventory is open through clicking on a chocobo to not break manual inventory open while the stable is open */
     private bool stablesOpen = false;
@@ -82,10 +83,6 @@ public sealed class Plugin : IDalamudPlugin
         stablesOpen = false;
         currentPageIdx = 0;
         closeStablesAtNextTick = false;
-
-        fedChocobos.Clear();
-        cappedChocobos.Clear();
-        chocoboRanks.Clear();
 
         resetTimers();
     }
@@ -244,13 +241,6 @@ public sealed class Plugin : IDalamudPlugin
         {
             Log.Error($"null cString??");
             return;
-        }
-
-        var fedChocobosThatCapped = fedChocobos.Intersect(cappedChocobos);
-        foreach (var cappedFedChocobo in fedChocobosThatCapped)
-        {
-            string rank = chocoboRanks.GetValueOrDefault(cappedFedChocobo, "N/A");
-            ChatGui.Print($"[Easy Stables] birbcapped: {cappedFedChocobo} on rank {rank}");
         }
 
         resetStateToInitial();
@@ -852,6 +842,22 @@ public sealed class Plugin : IDalamudPlugin
         {
             isEnabled = !isEnabled;
         }
+
+        if (!isEnabled)
+        {
+            ChatGui.Print($"[Easy Stables] Birds fed and capped during session:");
+            var fedChocobosThatCapped = fedChocobos.Intersect(cappedChocobos);
+            foreach (var cappedFedChocobo in fedChocobosThatCapped)
+            {
+                string rank = chocoboRanks.GetValueOrDefault(cappedFedChocobo, "N/A");
+                ChatGui.Print($"birbcapped: {cappedFedChocobo} on rank {rank}");
+            }
+
+            fedChocobos.Clear();
+            cappedChocobos.Clear();
+            chocoboRanks.Clear();
+        }
+
         string[] split = args.Split(' ');
 
         string subcommand = split[0];
