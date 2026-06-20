@@ -58,7 +58,6 @@ public sealed class Plugin : IDalamudPlugin
     private int currentPageIdx = 0;
 
     /* whether a synthetic click was automatically fired by the plugin */
-    private bool isStablesConditionGood = true;
     private bool closeStablesAtNextTick = false;
 
     private long delayMs = 1000; // configurable at runtime, so not const
@@ -80,7 +79,6 @@ public sealed class Plugin : IDalamudPlugin
     {
         stablesOpen = false;
         currentPageIdx = 0;
-        isStablesConditionGood = true;
         closeStablesAtNextTick = false;
 
         fedChocobos.Clear();
@@ -261,7 +259,6 @@ public sealed class Plugin : IDalamudPlugin
             red.G = 0;
             red.B = 0;
             castedTextNode->TextColor = red;
-            isStablesConditionGood = false;
             entryToSelect = "Clean Stable";
         } else
         {
