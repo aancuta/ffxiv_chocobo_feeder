@@ -3,6 +3,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.ClientState.GamePad;
+using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Command;
 using Dalamud.Game.Gui.Dtr;
 using Dalamud.Interface.Windowing;
@@ -15,6 +16,7 @@ using ECommons.DalamudServices;
 using ECommons.EzEventManager;
 using ECommons.UIHelpers.AddonMasterImplementations;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.Graphics;
 using FFXIVClientStructs.FFXIV.Client.System.Input;
 using FFXIVClientStructs.FFXIV.Client.UI;
@@ -193,9 +195,14 @@ public sealed class Plugin : IDalamudPlugin
             dtrText += timeLeft;
         } else
         {
-            dtrText = "Disabled";
+            dtrText += "Disabled";
         }
         _dtrEntry.Text = new Dalamud.Game.Text.SeStringHandling.SeString(new Dalamud.Game.Text.SeStringHandling.Payloads.TextPayload(dtrText));
+
+        if (isEnabled)
+        {
+            openStables();
+        }
     }
 
     private unsafe void CheckIfStableIsClean(AddonEvent type, AddonArgs args)
@@ -388,6 +395,7 @@ public sealed class Plugin : IDalamudPlugin
         // this is called in between feeding chocobos!
         stablesOpen = false;
         resetTimers();
+        timerNotReady(ref timeToDoStuffInStableCleanliness, BirdTimer);
     }
 
     private unsafe void HookStablesOpen(AddonEvent type, AddonArgs args)
@@ -804,7 +812,32 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    private void OnDTRClick(DtrInteractionEvent ev)
+    private IGameObject? FindNearestStables()
+    {
+        foreach (var obj in Svc.Objects)
+        {
+            if (obj.GameObjectId == 1073743500) { // "Chocobo Stable"
+                return obj;
+            }
+        }
+        return null;
+    }
+
+    private unsafe void openStables()
+    {
+        var stables = FindNearestStables();
+        if (stables != null)
+        {
+            Svc.Targets.Target = stables; // not needed functionally, but feeding birds without focusing the stables can be sus to other players
+            TargetSystem.Instance()->InteractWithObject((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)stables.Address, false);
+        }
+        else
+        {
+            Log.Error("No Stables found!");
+        }
+    }
+
+    private unsafe void OnDTRClick(DtrInteractionEvent ev)
     {
         OnCommand("/easystables", "");
     }
