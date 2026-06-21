@@ -922,6 +922,10 @@ public sealed class Plugin : IDalamudPlugin
             chocoboRanks.Clear();
         }
 
-        ChatGui.Print($"[Easy Stables] {(isEnabled ? "Enabled" : "Disabled")}. Delay {MainWindow.UserDelayMsPreference} ms, Bird Timer {MainWindow.BirdTimerMilisecondsPreference} ms");
+        float birdTimer = MainWindow.BirdTimerMilisecondsPreference;
+        birdTimer /= 60000; // convert to minutes
+
+        string delayMsg = $"Delay {MainWindow.UserDelayMsPreference} ms, Bird Timer {birdTimer} minutes";
+        ChatGui.Print($"[Easy Stables] {(isEnabled ? "Enabled with " + delayMsg : "Disabled")}.");
     }
 }
