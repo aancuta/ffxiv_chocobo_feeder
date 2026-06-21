@@ -55,6 +55,7 @@ public sealed class Plugin : IDalamudPlugin
     public Configuration Configuration { get; init; }
 
     public readonly WindowSystem WindowSystem = new("EasyStables");
+    private SamplePlugin.Windows.MainWindow MainWindow { get; init; }
 
     private bool isEnabled = false;
 
@@ -64,9 +65,6 @@ public sealed class Plugin : IDalamudPlugin
 
     /* whether a synthetic click was automatically fired by the plugin */
     private bool closeStablesAtNextTick = false;
-
-    private long delayMs = 1000; // configurable at runtime, so not const
-    private long birdTimer = 3660000; // (1 hour + 1 minute)
 
     private long timeToDoStuffInStables = 0;
     private long timeToDoStuffInInventory = 0;
@@ -108,10 +106,6 @@ public sealed class Plugin : IDalamudPlugin
         {
             HelpMessage = "Enable / Disable EasyStables"
         });
-        CommandManager.AddHandler(SubCommandName, new CommandInfo(OnCommand)
-        {
-            HelpMessage = "Change delay between automatic actions"
-        });
 
         _dtrEntry = Svc.DtrBar.Get("EasyStables");
         _dtrEntry.OnClick = OnDTRClick;
@@ -121,7 +115,14 @@ public sealed class Plugin : IDalamudPlugin
         resetTimers();
 
         Svc.Framework.Update += FrameworkUpdate;
+
+        WindowSystem.AddWindow(MainWindow = new SamplePlugin.Windows.MainWindow(this));
+        PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
+
+        PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
     }
+
+    void ToggleMainUi() => MainWindow.Toggle();
 
     private void ResetBirdTimer(AddonEvent type, AddonArgs args)
     {
@@ -201,9 +202,12 @@ public sealed class Plugin : IDalamudPlugin
         Svc.Framework.Update -= FrameworkUpdate;
 
         CommandManager.RemoveHandler(MainCommandName);
-        CommandManager.RemoveHandler(SubCommandName);
 
         _dtrEntry.Remove();
+
+        PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
+        WindowSystem.RemoveAllWindows();
+        MainWindow.Dispose();
     }
 
     private void FrameworkUpdate(IFramework framework)
@@ -242,7 +246,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
 
-        if (timerNotReady(ref timeToDoStuffInStableCleanliness, birdTimer))
+        if (timerNotReady(ref timeToDoStuffInStableCleanliness, MainWindow.BirdTimerMilisecondsPreference))
         {
             // parse the chocobo list every BirdTimer
             return;
@@ -414,7 +418,7 @@ public sealed class Plugin : IDalamudPlugin
         // this is called in between feeding chocobos!
         stablesOpen = false;
         resetTimers();
-        timerNotReady(ref timeToDoStuffInStableCleanliness, birdTimer);
+        timerNotReady(ref timeToDoStuffInStableCleanliness, MainWindow.BirdTimerMilisecondsPreference);
     }
 
     private unsafe void HookStablesOpen(AddonEvent type, AddonArgs args)
@@ -507,7 +511,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInInventory, delayMs))
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInInventory, MainWindow.UserDelayMsPreference))
         {
             return;
         }
@@ -647,7 +651,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInStables, delayMs))
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInStables, MainWindow.UserDelayMsPreference))
         {
             return;
         }
@@ -918,19 +922,6 @@ public sealed class Plugin : IDalamudPlugin
             chocoboRanks.Clear();
         }
 
-        string[] split = args.Split(' ');
-
-        string subcommand = split[0];
-        if (subcommand == "delay")
-        {
-            var parsed = int.Parse(split[1]);
-            if (parsed >= 0)
-            {
-                delayMs = parsed;
-            }
-        }
-
-        ChatGui.Print($"[Easy Stables] {(isEnabled ? "Enabled" : "Disabled")}");
-        ChatGui.Print($"[Easy Stables] Delay {delayMs}");
+        ChatGui.Print($"[Easy Stables] {(isEnabled ? "Enabled" : "Disabled")}. Delay {MainWindow.UserDelayMsPreference} ms, Bird Timer {MainWindow.BirdTimerMilisecondsPreference} ms");
     }
 }
