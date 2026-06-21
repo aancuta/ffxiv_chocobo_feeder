@@ -50,7 +50,6 @@ public sealed class Plugin : IDalamudPlugin
     public string Name => "EasyStables";
 
     private const string MainCommandName = "/easystables";
-    private const string SubCommandName = "/easystables delay [milliseconds]";
 
     public Configuration Configuration { get; init; }
 
@@ -104,7 +103,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(MainCommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Enable / Disable EasyStables"
+            HelpMessage = "Open config window"
         });
 
         _dtrEntry = Svc.DtrBar.Get("EasyStables");
