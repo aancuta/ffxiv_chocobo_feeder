@@ -118,21 +118,6 @@ public sealed class Plugin : IDalamudPlugin
 
         resetTimers();
 
-        addonLifecycle.RegisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
-        addonLifecycle.RegisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
-        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
-
-        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
-        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid3E", SearchInventoryForFood); // support full inventory
-
-        //addonLifecycle.RegisterListener(AddonEvent.PreReceiveEvent, "SelectString", PreEventHook);
-        // addonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "HousingChocoboList", PostEventHook);
-
-        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
-        addonLifecycle.RegisterListener(AddonEvent.PostClose, "SelectString", ResetBirdTimer);
-
-        addonLifecycle.RegisterListener(AddonEvent.PostDraw, "SelectYesno", UseBroom);
-
         Svc.Framework.Update += FrameworkUpdate;
     }
 
@@ -154,20 +139,62 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    public void registerListeners()
+    {
+        { // HousingChocoboList
+            lifeCycle.RegisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
+            lifeCycle.RegisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
+            lifeCycle.RegisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
+        }
+
+        { // InventoryGrid
+            lifeCycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+            lifeCycle.RegisterListener(AddonEvent.PostDraw, "InventoryGrid3E", SearchInventoryForFood); // support full inventory
+        }
+
+        { // SelectString
+            lifeCycle.RegisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
+            lifeCycle.RegisterListener(AddonEvent.PostClose, "SelectString", ResetBirdTimer);
+        }
+
+        { // SelectYesno
+            lifeCycle.RegisterListener(AddonEvent.PostDraw, "SelectYesno", UseBroom);
+        }
+
+        // { // debug code:
+        //     addonLifecycle.RegisterListener(AddonEvent.PreReceiveEvent, "SelectString", PreEventHook);
+        //     addonLifecycle.RegisterListener(AddonEvent.PostReceiveEvent, "HousingChocoboList", PostEventHook);
+        // }
+    }
+
+    public void unregisterListeners()
+    {
+        { // HousingChocoboList
+            lifeCycle.UnregisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
+            lifeCycle.UnregisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
+            lifeCycle.UnregisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
+        }
+
+        { // InventoryGrid
+            lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
+            lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid3E", SearchInventoryForFood);
+        }
+
+        { // SelectString
+            lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
+            lifeCycle.UnregisterListener(AddonEvent.PostClose, "SelectString", ResetBirdTimer);
+        }
+
+        { // SelectYesno
+            lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectYesno", UseBroom);
+        }
+    }
+
     public void Dispose()
     {
         isEnabled = false;
-        lifeCycle.UnregisterListener(AddonEvent.PreOpen, "HousingChocoboList", HookStablesOpen);
-        lifeCycle.UnregisterListener(AddonEvent.PostClose, "HousingChocoboList", HookStablesClose);
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "HousingChocoboList", SyncWithGameState);
-         
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid", SearchInventoryForFood);
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "InventoryGrid3E", SearchInventoryForFood);
 
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectString", CheckIfStableIsClean);
-        lifeCycle.UnregisterListener(AddonEvent.PostClose, "SelectString", ResetBirdTimer);
-
-        lifeCycle.UnregisterListener(AddonEvent.PostDraw, "SelectYesno", UseBroom);
+        unregisterListeners();
 
         Svc.Framework.Update -= FrameworkUpdate;
 
@@ -212,7 +239,6 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        var addonAddress = args.Addon.Address;
 
         if (timerNotReady(ref timeToDoStuffInStableCleanliness, BirdTimer))
         {
@@ -222,6 +248,7 @@ public sealed class Plugin : IDalamudPlugin
 
         Log.Info("CheckIfStableIsClean");
 
+        var addonAddress = args.Addon.Address;
         var stablesAddon = (AddonSelectString*)addonAddress;
         var textNode = stablesAddon->GetNodeById(2);
         if (textNode == null)
@@ -472,7 +499,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe void SearchInventoryForFood(AddonEvent type, AddonArgs args)
     {
-        if (!isEnabled || !stablesOpen)
+        if (!stablesOpen)
         {
             // don't break non-automated inventory open
             return;
@@ -540,13 +567,8 @@ public sealed class Plugin : IDalamudPlugin
 
                 if (indexOfReward >= 0) {
                     Log.Information($"Clicking Reward!");
-                    AtkValue* param = stackalloc AtkValue[5];
-                    for(int j = 0; j < 5; j++)
-                    {
-                        param[j].Type = AtkValueType.Int;
-                    }
-                    param[3].Int = looper;
-                    contextMenuAddon->FireCallback(5, param);
+
+                    ECommons.Automation.Callback.Fire((AtkUnitBase*)contextMenuAddon, false, 0, indexOfReward, 0, 0, 0);
                 }
 
                 this.resetTimers();
@@ -620,11 +642,6 @@ public sealed class Plugin : IDalamudPlugin
         if (!args.Addon.IsVisible || !args.Addon.IsReady)
         {
             this.resetTimers();
-            return;
-        }
-
-        if (!isEnabled)
-        {
             return;
         }
 
@@ -842,9 +859,15 @@ public sealed class Plugin : IDalamudPlugin
         {
             isEnabled = !isEnabled;
         }
-
-        if (!isEnabled)
+        
+        if (isEnabled)
         {
+            registerListeners();
+        }
+        else
+        {
+            unregisterListeners();
+
             ChatGui.Print($"[Easy Stables] Birds fed and capped during session:");
             var fedChocobosThatCapped = fedChocobos.Intersect(cappedChocobos);
             foreach (var cappedFedChocobo in fedChocobosThatCapped)
