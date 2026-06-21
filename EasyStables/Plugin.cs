@@ -14,6 +14,7 @@ using Dalamud.Plugin.Services;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.EzEventManager;
+using ECommons.GameHelpers;
 using ECommons.UIHelpers.AddonMasterImplementations;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
@@ -21,6 +22,7 @@ using FFXIVClientStructs.FFXIV.Client.Graphics;
 using FFXIVClientStructs.FFXIV.Client.System.Input;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
+using FFXIVClientStructs.FFXIV.Common.Math;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using System;
 using System.Collections;
@@ -64,7 +66,7 @@ public sealed class Plugin : IDalamudPlugin
     private bool closeStablesAtNextTick = false;
 
     private long delayMs = 1000; // configurable at runtime, so not const
-    private const long BirdTimer = 3660000; // (1 hour + 1 minute)
+    private long birdTimer = 3660000; // (1 hour + 1 minute)
 
     private long timeToDoStuffInStables = 0;
     private long timeToDoStuffInInventory = 0;
@@ -240,7 +242,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
 
-        if (timerNotReady(ref timeToDoStuffInStableCleanliness, BirdTimer))
+        if (timerNotReady(ref timeToDoStuffInStableCleanliness, birdTimer))
         {
             // parse the chocobo list every BirdTimer
             return;
@@ -412,7 +414,7 @@ public sealed class Plugin : IDalamudPlugin
         // this is called in between feeding chocobos!
         stablesOpen = false;
         resetTimers();
-        timerNotReady(ref timeToDoStuffInStableCleanliness, BirdTimer);
+        timerNotReady(ref timeToDoStuffInStableCleanliness, birdTimer);
     }
 
     private unsafe void HookStablesOpen(AddonEvent type, AddonArgs args)
@@ -819,11 +821,32 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    // same as https://github.com/PunishXIV/PandorasBox/blob/f02c572816446a0f9c34fa3e53480f07f08283fe/PandorasBox/Helpers/GameObjectHelper.cs#L11
+    public static float GetTargetDistance(IGameObject target)
+    {
+        if (target is null || Svc.Objects.LocalPlayer is null)
+            return 0;
+
+        if (target.GameObjectId == Svc.Objects.LocalPlayer.GameObjectId)
+            return 0;
+
+        Vector3 position = new(target.Position.X, target.Position.Z, target.Position.Y);
+        Vector3 selfPosition = new(Player.Position.X, Player.Position.Z, Player.Position.Y);
+
+        return Math.Max(0, Vector3.Distance(position, selfPosition) - target.HitboxRadius - Svc.Objects.LocalPlayer.HitboxRadius);
+    }
+
+    private bool isObjectWithinDistance(IGameObject obj, float yalms)
+    {
+        return GetTargetDistance(obj) <= yalms;
+    }
+
     private IGameObject? FindNearestStables()
     {
         foreach (var obj in Svc.Objects)
         {
-            if (obj.GameObjectId == 1073743500) { // "Chocobo Stable"
+            bool isStables = obj.GameObjectId == 1073743500; // "Chocobo Stable"
+            if (isStables && isObjectWithinDistance(obj, 4.0f)) {
                 return obj;
             }
         }
@@ -862,20 +885,34 @@ public sealed class Plugin : IDalamudPlugin
         
         if (isEnabled)
         {
-            registerListeners();
+            if (FindNearestStables() == null)
+            {
+                ChatGui.PrintError("No nearby Stables found!");
+                isEnabled = false;
+                return;
+            }
         }
-        else
+
+        if (isEnabled)
         {
+            registerListeners();
+        } else {
             unregisterListeners();
 
-            ChatGui.Print($"[Easy Stables] Birds fed and capped during session:");
             var fedChocobosThatCapped = fedChocobos.Intersect(cappedChocobos);
-            foreach (var cappedFedChocobo in fedChocobosThatCapped)
+            if (fedChocobosThatCapped.Any())
             {
-                string rank = chocoboRanks.GetValueOrDefault(cappedFedChocobo, "N/A");
-                ChatGui.Print($"birbcapped: {cappedFedChocobo} on rank {rank}");
-            }
+                ChatGui.Print($"[Easy Stables] {fedChocobosThatCapped.Count()} Birds capped during session:");
+                foreach (var cappedFedChocobo in fedChocobosThatCapped)
+                {
+                    string rank = chocoboRanks.GetValueOrDefault(cappedFedChocobo, "N/A");
+                    ChatGui.Print($"birbcapped: {cappedFedChocobo} on rank {rank}");
+                }
 
+            } else
+            {
+                ChatGui.Print($"[Easy Stables] No birds capped during session.");
+            }
             fedChocobos.Clear();
             cappedChocobos.Clear();
             chocoboRanks.Clear();
