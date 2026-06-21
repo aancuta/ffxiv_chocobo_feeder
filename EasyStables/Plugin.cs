@@ -124,6 +124,11 @@ public sealed class Plugin : IDalamudPlugin
 
     void ToggleMainUi() => MainWindow.Toggle();
 
+    public void invalidateTimers()
+    {
+        timeToDoStuffInStableCleanliness = 0;
+    }
+
     private void ResetBirdTimer(AddonEvent type, AddonArgs args)
     {
         timeToDoStuffInStableCleanliness = 0;
@@ -213,20 +218,39 @@ public sealed class Plugin : IDalamudPlugin
     private void FrameworkUpdate(IFramework framework)
     {
         string dtrText = "Stables: ";
+
         if (isEnabled)
         {
-            // convert remaining bird timer to minutes:
-            var timeToNextTimer = ((timeToDoStuffInStableCleanliness - Environment.TickCount64) / 1000 / 60);
-            if (timeToNextTimer <= 0)
-            {
-                timeToNextTimer = 0;
-            }
-            string timeLeft = (timeToNextTimer == 0 ? "Ready!" : timeToNextTimer.ToString() + "min");
-            dtrText += timeLeft;
+            dtrText += "Enabled";
         } else
         {
             dtrText += "Disabled";
         }
+
+
+        // convert remaining bird timer to minutes:
+        float timeToNextTimer = timeToDoStuffInStableCleanliness - Environment.TickCount64;
+        timeToNextTimer /= 1000; // convert to seconds
+        string unitOfMeasurement;
+        if (timeToNextTimer < 60)
+        {
+            unitOfMeasurement = "s";
+        }
+        else
+        {
+            timeToNextTimer /= 60; // convert to minutes
+            unitOfMeasurement = "min";
+        }
+
+        timeToNextTimer = (float)Math.Round(timeToNextTimer, 0);
+
+        if (timeToNextTimer <= 0)
+        {
+            timeToNextTimer = 0;
+        }
+        string timeLeft = " - " + (timeToNextTimer == 0 ? "Ready!" : timeToNextTimer.ToString() + unitOfMeasurement);
+        dtrText += timeLeft;
+
         _dtrEntry.Text = new Dalamud.Game.Text.SeStringHandling.SeString(new Dalamud.Game.Text.SeStringHandling.Payloads.TextPayload(dtrText));
 
         if (isEnabled)
@@ -873,20 +897,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private unsafe void OnDTRClick(DtrInteractionEvent ev)
     {
-        OnCommand("/easystables", "");
-    }
+        isEnabled = !isEnabled;
 
-    private void OnCommand(string command, string args)
-    {
-        if (command.ToLower() != "/easystables")
-        {
-            return;
-        }
-        if (string.IsNullOrEmpty(args))
-        {
-            isEnabled = !isEnabled;
-        }
-        
         if (isEnabled)
         {
             if (FindNearestStables() == null)
@@ -900,7 +912,9 @@ public sealed class Plugin : IDalamudPlugin
         if (isEnabled)
         {
             registerListeners();
-        } else {
+        }
+        else
+        {
             unregisterListeners();
 
             var fedChocobosThatCapped = fedChocobos.Intersect(cappedChocobos);
@@ -913,7 +927,8 @@ public sealed class Plugin : IDalamudPlugin
                     ChatGui.Print($"birbcapped: {cappedFedChocobo} on rank {rank}");
                 }
 
-            } else
+            }
+            else
             {
                 ChatGui.Print($"[Easy Stables] No birds capped during session.");
             }
@@ -921,11 +936,15 @@ public sealed class Plugin : IDalamudPlugin
             cappedChocobos.Clear();
             chocoboRanks.Clear();
         }
+    }
 
-        float birdTimer = MainWindow.BirdTimerMilisecondsPreference;
-        birdTimer /= 60000; // convert to minutes
+    private void OnCommand(string command, string args)
+    {
+        if (command.ToLower() != "/easystables")
+        {
+            return;
+        }
 
-        string delayMsg = $"Delay {MainWindow.UserDelayMsPreference} ms, Bird Timer {birdTimer} minutes";
-        ChatGui.Print($"[Easy Stables] {(isEnabled ? "Enabled with " + delayMsg : "Disabled")}.");
+        MainWindow.Toggle();
     }
 }
