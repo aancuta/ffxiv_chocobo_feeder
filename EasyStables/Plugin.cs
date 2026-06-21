@@ -64,7 +64,7 @@ public sealed class Plugin : IDalamudPlugin
     private bool closeStablesAtNextTick = false;
 
     private long delayMs = 1000; // configurable at runtime, so not const
-    private const long BirdTimer = 3660000 / 4; // (1 hour + 1 minute) but check every ~15 minutes in case someone else feeds and disturbs the one hour timer
+    private const long BirdTimer = 3660000; // (1 hour + 1 minute)
 
     private long timeToDoStuffInStables = 0;
     private long timeToDoStuffInInventory = 0;
