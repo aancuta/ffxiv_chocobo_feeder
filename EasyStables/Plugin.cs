@@ -68,6 +68,7 @@ public sealed class Plugin : IDalamudPlugin
     private long timeToDoStuffInStables = 0;
     private long timeToDoStuffInInventory = 0;
     private long timeToDoStuffInStableCleanliness = 0;
+    private long timeToDoStuffInFrameworkUpdate = 0;
 
     private HashSet<string> fedChocobos = new HashSet<string>();
     private HashSet<string> cappedChocobos = new HashSet<string>();
@@ -142,6 +143,7 @@ public sealed class Plugin : IDalamudPlugin
         Log.Info(select.Text);
         if (select.Text.Contains("Use a magicked stable broom"))
         {
+            timeToDoStuffInStableCleanliness = 0; // after broom, feed the birds immediately without waiting for the next sync
             select.Yes();
         }
     }
@@ -216,6 +218,12 @@ public sealed class Plugin : IDalamudPlugin
 
     private void FrameworkUpdate(IFramework framework)
     {
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInFrameworkUpdate, MainWindow.UserDelayMsPreference))
+        {
+            // no need to refresh UI on each FPS
+            return;
+        }
+
         string dtrText = "Stables: ";
 
         if (isEnabled)
@@ -872,7 +880,8 @@ public sealed class Plugin : IDalamudPlugin
     {
         foreach (var obj in Svc.Objects)
         {
-            bool isStables = obj.GameObjectId == 1073743500; // "Chocobo Stable"
+            // GameObjectId was 1073743500, then changed to 1073743521; string is more reliable, although will only work with an EN game
+            bool isStables = obj.Name.ToString() == "Chocobo Stable";
             if (isStables && isObjectWithinDistance(obj, 4.0f)) {
                 return obj;
             }
