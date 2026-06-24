@@ -15,6 +15,7 @@ using ECommons;
 using ECommons.DalamudServices;
 using ECommons.EzEventManager;
 using ECommons.GameHelpers;
+using ECommons.Throttlers;
 using ECommons.UIHelpers.AddonMasterImplementations;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
@@ -69,6 +70,7 @@ public sealed class Plugin : IDalamudPlugin
     private long timeToDoStuffInInventory = 0;
     private long timeToDoStuffInStableCleanliness = 0;
     private long timeToDoStuffInFrameworkUpdate = 0;
+    private long timeToOpenStables = 0;
 
     private HashSet<string> fedChocobos = new HashSet<string>();
     private HashSet<string> cappedChocobos = new HashSet<string>();
@@ -216,7 +218,7 @@ public sealed class Plugin : IDalamudPlugin
         MainWindow.Dispose();
     }
 
-    private void FrameworkUpdate(IFramework framework)
+    private unsafe void FrameworkUpdate(IFramework framework)
     {
         if (timerNotReadyOrNeedsStart(ref timeToDoStuffInFrameworkUpdate, MainWindow.UserDelayMsPreference))
         {
@@ -260,10 +262,41 @@ public sealed class Plugin : IDalamudPlugin
 
         _dtrEntry.Text = new Dalamud.Game.Text.SeStringHandling.SeString(new Dalamud.Game.Text.SeStringHandling.Payloads.TextPayload(dtrText));
 
-        if (isEnabled)
+
+        if (!EzThrottler.Throttle("OpenStables", MainWindow.UserDelayMsPreference))
         {
+            // Don't spam multiple openStables() calls until the window opens
+            return;
+        }
+
+        if (isEnabled && !(isStablesInitialMenuOpen() || stablesOpen))
+        {
+            Log.Info("Opening stables!");
             openStables();
         }
+    }
+
+
+    private unsafe bool isStablesInitialMenuOpen()
+    {
+        var stablesSelectString = (AddonSelectString*)Svc.GameGui.GetAddonByName("SelectString").Address;
+        if (stablesSelectString == null) {
+            return false;
+        }
+        
+        if (stablesSelectString->IsVisible == false)
+        {
+            return false;
+        }
+
+        var textNode = stablesSelectString->GetNodeById(2);
+        if (textNode == null)
+        {
+            return false;
+        }
+
+        var castedTextNode = textNode->GetAsAtkTextNode();
+        return castedTextNode != null && castedTextNode->GetText().ToString().Contains("Stable Cleanliness");
     }
 
     private unsafe void CheckIfStableIsClean(AddonEvent type, AddonArgs args)
@@ -876,13 +909,18 @@ public sealed class Plugin : IDalamudPlugin
         return GetTargetDistance(obj) <= yalms;
     }
 
+    private unsafe bool isStables(IGameObject obj)
+    {
+        if (obj == null) return false;
+        // GameObjectId was 1073743500, then changed to 1073743521; string is more reliable, although will only work with an EN game
+        return obj.Name.ToString() == "Chocobo Stable";
+    }
+
     private IGameObject? FindNearestStables()
     {
         foreach (var obj in Svc.Objects)
         {
-            // GameObjectId was 1073743500, then changed to 1073743521; string is more reliable, although will only work with an EN game
-            bool isStables = obj.Name.ToString() == "Chocobo Stable";
-            if (isStables && isObjectWithinDistance(obj, 4.0f)) {
+            if (obj != null && isStables(obj) && isObjectWithinDistance(obj, 4.0f)) {
                 return obj;
             }
         }
