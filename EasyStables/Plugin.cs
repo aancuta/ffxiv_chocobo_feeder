@@ -32,6 +32,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text.RegularExpressions;
 using System.Threading;
 using static ECommons.UIHelpers.AddonMasterImplementations.AddonMaster;
 using static FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.VertexShader;
@@ -707,6 +708,20 @@ public sealed class Plugin : IDalamudPlugin
         this.resetTimers();
     }
 
+    private unsafe int remainingTrainingTimeToMs(AtkTextNode* trainingTextNode)
+    {
+        Regex numberRegex = new Regex(@"\d+");
+        var match = numberRegex.Match(trainingTextNode->GetText().ToString());
+        if (match.Success)
+        {
+            var nextFeedTime = trainingTextNode->GetText().ToString(); // 42m for example
+                                                                       // strip the "m" and convert to int
+            var nextFeedTimeInt = int.Parse(match.Value);
+            return nextFeedTimeInt * 60 * 1000; // convert to milliseconds
+        }
+        return -1;
+    }
+
     private unsafe void SyncWithGameState(AddonEvent type, AddonArgs args)
     {
         if (!args.Addon.IsVisible || !args.Addon.IsReady)
@@ -777,6 +792,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         bool anyChocoboFed = false;
+        int msUntilNextFeed = -1;
 
         var allChocobos = innerChocoboListAsAtkComponentList->UldManager.NodeList;
         for (int i = 2; i < innerChocoboListAsAtkComponentList->UldManager.NodeListCount; ++i)
@@ -832,6 +848,11 @@ public sealed class Plugin : IDalamudPlugin
 
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
+            if (!isReady)
+            {
+                var remainingTime = remainingTrainingTimeToMs(trainingTextNode);
+                msUntilNextFeed = Math.Max(msUntilNextFeed, remainingTime);
+            }
 
             string chocoboIdentifier = $"{chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()}";
 
@@ -881,6 +902,12 @@ public sealed class Plugin : IDalamudPlugin
                 // simulate a click to go to the first page in a more "orthodox" manner; note: no, setSelectedStablesListIdx does not work.
                 syntheticStablesListClick(stablesAddon, 0);
                 closeStablesAtNextTick = true;
+
+                // the bird timer needs to be updated to minutesUntilNextFeed minutes in case someone else fed the birds.
+                if (msUntilNextFeed >= 0)
+                {
+                    timeToDoStuffInStableCleanliness = Environment.TickCount64 + msUntilNextFeed;
+                }
             }
             this.resetTimers();
         } else
