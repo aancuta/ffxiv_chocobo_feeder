@@ -17,6 +17,7 @@ using ECommons.DalamudServices;
 using ECommons.DalamudServices.Legacy;
 using ECommons.EzEventManager;
 using ECommons.GameHelpers;
+using ECommons.SimpleGui;
 using ECommons.Throttlers;
 using ECommons.UIHelpers.AddonMasterImplementations;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -75,7 +76,6 @@ public sealed class Plugin : IDalamudPlugin
     private long timeToDoStuffInInventory = 0;
     private long timeToDoStuffInStableCleanliness = 0;
     private long timeToDoStuffInFrameworkUpdate = 0;
-    private long timeToOpenStables = 0;
 
     private HashSet<string> fedChocobos = new HashSet<string>();
     private HashSet<string> cappedChocobos = new HashSet<string>();
@@ -86,14 +86,14 @@ public sealed class Plugin : IDalamudPlugin
 
     public async Task SendToBark(string title, string content)
     {
-        Log.Info(MainWindow.BarkServerURLPreference);
-        if (MainWindow.BarkServerURLPreference.IsNullOrEmpty())
+        Log.Info(Configuration.BarkServer);
+        if (Configuration.BarkServer.IsNullOrEmpty())
         {
             // don't error out for no server URL, just don't send the notification
             return;
         }
 
-        string serverUrl = MainWindow.BarkServerURLPreference.TrimEnd('/');
+        string serverUrl = Configuration.BarkServer.TrimEnd('/');
         var url = $"{serverUrl}/{title}/{content}?" +
                  $"sound=ff14&icon=https://cdn2.steamgriddb.com/icon/5f268dfb0fbef44de0f668a022707b86/32/256x256.png" + // Customize notify ring and icon
                  "&level=timeSensitive"; // iOS Time Sensitive
@@ -149,7 +149,9 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
     }
 
-    void ToggleMainUi() => MainWindow.Toggle();
+    public void ToggleMainUi() => MainWindow.Toggle();
+    public void ToggleConfigUi() => MainWindow.Toggle();
+
 
     static HashSet<Dalamud.Game.Text.XivChatType> DalamudChatsToMonitor = new HashSet<Dalamud.Game.Text.XivChatType> {
         Dalamud.Game.Text.XivChatType.GmSay,
@@ -259,11 +261,12 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
         WindowSystem.RemoveAllWindows();
         MainWindow.Dispose();
+        Configuration.Save();
     }
 
     private unsafe void FrameworkUpdate(IFramework framework)
     {
-        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInFrameworkUpdate, MainWindow.UserDelayMsPreference))
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInFrameworkUpdate, Configuration.userDelayMs))
         {
             // no need to refresh UI on each FPS
             return;
@@ -306,7 +309,7 @@ public sealed class Plugin : IDalamudPlugin
         _dtrEntry.Text = new Dalamud.Game.Text.SeStringHandling.SeString(new Dalamud.Game.Text.SeStringHandling.Payloads.TextPayload(dtrText));
 
 
-        if (!EzThrottler.Throttle("OpenStables", MainWindow.UserDelayMsPreference))
+        if (!EzThrottler.Throttle("OpenStables", Configuration.userDelayMs))
         {
             // Don't spam multiple openStables() calls until the window opens
             return;
@@ -618,7 +621,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInInventory, MainWindow.UserDelayMsPreference))
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInInventory, Configuration.userDelayMs))
         {
             return;
         }
@@ -772,7 +775,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInStables, MainWindow.UserDelayMsPreference))
+        if (timerNotReadyOrNeedsStart(ref timeToDoStuffInStables, Configuration.userDelayMs))
         {
             return;
         }

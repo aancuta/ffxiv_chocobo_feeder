@@ -2,6 +2,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
 using Dalamud.Interface.Windowing;
 using EasyStables;
+using Serilog;
 using System;
 using System.Numerics;
 
@@ -11,12 +12,11 @@ namespace SamplePlugin
     {
         internal class MainWindow : Window
         {
+            private string barkServer = "";
+            private int delayMs = 0;
+
             private Plugin plugin;
             private Configuration config;
-
-            private int userDelayMs;
-            private int birdTimer;
-            private string barkServerURL = "";
 
             public MainWindow(Plugin plugin, Configuration config) : base("EasyStables Window")
             {
@@ -27,36 +27,38 @@ namespace SamplePlugin
                 };
                 this.plugin = plugin;
                 this.config = config;
-                userDelayMs = 1000; // default to 1000
+                barkServer = config.BarkServer;
+                delayMs = config.userDelayMs;
             }
-
-            public int UserDelayMsPreference { get => userDelayMs; internal set => userDelayMs = value; }
-            public string BarkServerURLPreference { get => barkServerURL; internal set => barkServerURL = value; }
 
             public override void Draw()
             {
                 ImGui.Text("Use the Server Info bar at the top to toggle the plugin.");
 
-                ImGui.InputInt("User Delay (ms)", ref userDelayMs);
-
-                ImGui.InputText("Bark Server URL", ref barkServerURL);
+                ImGui.InputInt("User Delay (ms)", ref delayMs);
+                ImGui.InputText("Bark Server URL", ref barkServer);
                 ImGui.SameLine();
                 if(ImGui.Button("Test"))
                 {
                     // Test the Bark Server URL
                     plugin.SendToBark("Test title", "Test content");
                 }
-            }
 
-            private void SaveConfig()
-            {
-                config.userDelayMs = userDelayMs;
-                config.BarkServer = barkServerURL;
-                config.Save();
+                if (ImGui.Button("Save Config"))
+                {
+                    if (barkServer != config.BarkServer || delayMs != config.userDelayMs)
+                    {
+                        Log.Information("Save triggered!");
+                        config.userDelayMs = delayMs;
+                        config.BarkServer = barkServer;
+                        config.Save();
+                    }
+                }
             }
 
             internal void Dispose()
             {
+                config.Save();
             }
         }
     }
