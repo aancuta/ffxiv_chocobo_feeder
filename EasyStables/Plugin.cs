@@ -2,6 +2,7 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
+using Dalamud.Game.Chat;
 using Dalamud.Game.ClientState.GamePad;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Command;
@@ -13,6 +14,7 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using ECommons;
 using ECommons.DalamudServices;
+using ECommons.DalamudServices.Legacy;
 using ECommons.EzEventManager;
 using ECommons.GameHelpers;
 using ECommons.Throttlers;
@@ -30,10 +32,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Threading.Tasks;
 using static ECommons.UIHelpers.AddonMasterImplementations.AddonMaster;
 using static FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.VertexShader;
 using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
@@ -78,6 +82,25 @@ public sealed class Plugin : IDalamudPlugin
 
     private Dictionary<string, string> chocoboRanks = new Dictionary<string, string>();
 
+    private HttpClient httpClient = new HttpClient();
+
+    public async Task SendToBark(string title, string content)
+    {
+        Log.Info(MainWindow.BarkServerURLPreference);
+        if (MainWindow.BarkServerURLPreference.IsNullOrEmpty())
+        {
+            // don't error out for no server URL, just don't send the notification
+            return;
+        }
+
+        string serverUrl = MainWindow.BarkServerURLPreference.TrimEnd('/');
+        var url = $"{serverUrl}/{title}/{content}?" +
+                 $"sound=ff14&icon=https://cdn2.steamgriddb.com/icon/5f268dfb0fbef44de0f668a022707b86/32/256x256.png" + // Customize notify ring and icon
+                 "&level=timeSensitive"; // iOS Time Sensitive
+        var response = await httpClient.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+    }
+
 
     private static IDtrBarEntry _dtrEntry;
 
@@ -118,14 +141,33 @@ public sealed class Plugin : IDalamudPlugin
         resetTimers();
 
         Svc.Framework.Update += FrameworkUpdate;
+        Svc.Chat.ChatMessage += ChatMessage;
 
-        WindowSystem.AddWindow(MainWindow = new SamplePlugin.Windows.MainWindow(this));
+        WindowSystem.AddWindow(MainWindow = new SamplePlugin.Windows.MainWindow(this, Configuration));
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
     }
 
     void ToggleMainUi() => MainWindow.Toggle();
+
+    static HashSet<Dalamud.Game.Text.XivChatType> DalamudChatsToMonitor = new HashSet<Dalamud.Game.Text.XivChatType> {
+        Dalamud.Game.Text.XivChatType.GmSay,
+        Dalamud.Game.Text.XivChatType.GmShout,
+        Dalamud.Game.Text.XivChatType.GmYell,
+        Dalamud.Game.Text.XivChatType.GmTell,
+        Dalamud.Game.Text.XivChatType.GmParty,
+        Dalamud.Game.Text.XivChatType.TellIncoming,
+    };
+
+    private void ChatMessage(IChatMessage message)
+    {
+        if (!DalamudChatsToMonitor.Contains(message.Type))
+        {
+            return;
+        }
+        SendToBark("Chat Message", message.Message.ToString());
+    }
 
     public void invalidateTimers()
     {
@@ -311,7 +353,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
 
-        if (timerNotReady(ref timeToDoStuffInStableCleanliness, MainWindow.BirdTimerMilisecondsPreference))
+        if (timerNotReady(ref timeToDoStuffInStableCleanliness, timeToDoStuffInStableCleanliness))
         {
             // parse the chocobo list every BirdTimer
             return;
@@ -483,7 +525,7 @@ public sealed class Plugin : IDalamudPlugin
         // this is called in between feeding chocobos!
         stablesOpen = false;
         resetTimers();
-        timerNotReady(ref timeToDoStuffInStableCleanliness, MainWindow.BirdTimerMilisecondsPreference);
+        timerNotReady(ref timeToDoStuffInStableCleanliness, timeToDoStuffInStableCleanliness);
     }
 
     private unsafe void HookStablesOpen(AddonEvent type, AddonArgs args)

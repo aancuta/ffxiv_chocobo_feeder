@@ -12,11 +12,13 @@ namespace SamplePlugin
         internal class MainWindow : Window
         {
             private Plugin plugin;
+            private Configuration config;
 
             private int userDelayMs;
-            private int birdTimerMiliseconds;
+            private int birdTimer;
+            private string barkServerURL = "";
 
-            public MainWindow(Plugin plugin) : base("EasyStables Window")
+            public MainWindow(Plugin plugin, Configuration config) : base("EasyStables Window")
             {
                 SizeConstraints = new WindowSizeConstraints
                 {
@@ -24,12 +26,12 @@ namespace SamplePlugin
                     MaximumSize = new Vector2(500.0f, 505.0f),
                 };
                 this.plugin = plugin;
+                this.config = config;
                 userDelayMs = 1000; // default to 1000
-                birdTimerMiliseconds = 61 * 60 * 1000; // default to 61 minutes
             }
 
             public int UserDelayMsPreference { get => userDelayMs; internal set => userDelayMs = value; }
-            public int BirdTimerMilisecondsPreference { get => birdTimerMiliseconds; internal set => birdTimerMiliseconds = value; }
+            public string BarkServerURLPreference { get => barkServerURL; internal set => barkServerURL = value; }
 
             public override void Draw()
             {
@@ -37,13 +39,24 @@ namespace SamplePlugin
 
                 ImGui.InputInt("User Delay (ms)", ref userDelayMs);
 
-                ImGui.InputInt("Bird Timer (ms)", ref birdTimerMiliseconds);
-                ImGui.Text("Minutes equivalent: " + (birdTimerMiliseconds / 60000).ToString());
+                ImGui.InputText("Bark Server URL", ref barkServerURL);
+                ImGui.SameLine();
+                if(ImGui.Button("Test"))
+                {
+                    // Test the Bark Server URL
+                    plugin.SendToBark("Test title", "Test content");
+                }
+            }
+
+            private void SaveConfig()
+            {
+                config.userDelayMs = userDelayMs;
+                config.BarkServer = barkServerURL;
+                config.Save();
             }
 
             internal void Dispose()
             {
-
             }
         }
     }
