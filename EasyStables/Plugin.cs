@@ -171,14 +171,14 @@ public sealed class Plugin : IDalamudPlugin
         SendToBark("Chat Message", $"{message.Sender}: {message.Message.ToString()}");
     }
 
-    public void invalidateTimers()
+    public void resetBirdTimer()
     {
-        timeToDoStuffInStableCleanliness = 0;
+        timeToDoStuffInStableCleanliness = Environment.TickCount64 + 5 * Configuration.userDelayMs;
     }
 
     private void ResetBirdTimer(AddonEvent type, AddonArgs args)
     {
-        timeToDoStuffInStableCleanliness = 0;
+        resetBirdTimer();
     }
 
     private unsafe void UseBroom(AddonEvent type, AddonArgs args)
@@ -190,7 +190,7 @@ public sealed class Plugin : IDalamudPlugin
         Log.Info(select.Text);
         if (select.Text.Contains("Use a magicked stable broom"))
         {
-            timeToDoStuffInStableCleanliness = 0; // after broom, feed the birds immediately without waiting for the next sync
+            resetBirdTimer(); // after broom, feed the birds immediately without waiting for the next sync
             select.Yes();
         }
     }
