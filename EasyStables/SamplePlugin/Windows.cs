@@ -33,9 +33,12 @@ namespace SamplePlugin
 
             public override void Draw()
             {
+                ImGui.Text("Use the Server Info bar at the top to toggle the plugin.");
+
                 ImGui.InputInt("User Delay (ms)", ref userDelayMs);
 
                 ImGui.InputInt("Bird Timer (ms)", ref birdTimerMiliseconds);
+                ImGui.Text("Minutes equivalent: " + (birdTimerMiliseconds / 60000).ToString());
             }
 
             internal void Dispose()
