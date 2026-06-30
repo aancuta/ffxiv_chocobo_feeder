@@ -168,7 +168,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             return;
         }
-        SendToBark("Chat Message", message.Message.ToString());
+        SendToBark("Chat Message", $"{message.Sender}: {message.Message.ToString()}");
     }
 
     public void invalidateTimers()
