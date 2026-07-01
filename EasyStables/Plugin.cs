@@ -762,7 +762,7 @@ public sealed class Plugin : IDalamudPlugin
             var nextFeedTime = trainingTextNode->GetText().ToString(); // 42m for example
                                                                        // strip the "m" and convert to int
             var nextFeedTimeInt = int.Parse(match.Value);
-            return nextFeedTimeInt * 60 * 1000; // convert to milliseconds
+            return (nextFeedTimeInt + 1) * 60 * 1000; // convert to milliseconds; add a minute
         }
         return -1;
     }
@@ -948,7 +948,6 @@ public sealed class Plugin : IDalamudPlugin
                 syntheticStablesListClick(stablesAddon, 0);
                 closeStablesAtNextTick = true;
 
-                // the bird timer needs to be updated to minutesUntilNextFeed minutes in case someone else fed the birds.
                 if (msUntilNextFeed >= 0)
                 {
                     timeToDoStuffInStableCleanliness = Environment.TickCount64 + msUntilNextFeed;
