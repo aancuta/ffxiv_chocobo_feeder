@@ -951,6 +951,8 @@ public sealed class Plugin : IDalamudPlugin
                 if (msUntilNextFeed >= 0)
                 {
                     timeToDoStuffInStableCleanliness = Environment.TickCount64 + msUntilNextFeed;
+                    var randomDelayMin = (Configuration.birdTimerDelayMin + Random.Shared.NextDouble() * (Configuration.birdTimerDelayMax - Configuration.birdTimerDelayMin));
+                    timeToDoStuffInStableCleanliness += (long)(randomDelayMin * 1000 * 60);
                 }
             }
             this.resetTimers();

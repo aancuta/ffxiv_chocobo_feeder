@@ -14,6 +14,8 @@ namespace SamplePlugin
         {
             private string barkServer = "";
             private int delayMs = 0;
+            private int birdTimerDelayMin = 0;
+            private int birdTimerDelayMax = 0;
 
             private Plugin plugin;
             private Configuration config;
@@ -22,13 +24,15 @@ namespace SamplePlugin
             {
                 SizeConstraints = new WindowSizeConstraints
                 {
-                    MinimumSize = new Vector2(500.0f, 505.0f),
-                    MaximumSize = new Vector2(500.0f, 505.0f),
+                    MinimumSize = new Vector2(600.0f, 250.0f),
+                    MaximumSize = new Vector2(600.0f, 250.0f),
                 };
                 this.plugin = plugin;
                 this.config = config;
                 barkServer = config.BarkServer;
                 delayMs = config.userDelayMs;
+                birdTimerDelayMin = config.birdTimerDelayMin;
+                birdTimerDelayMax = config.birdTimerDelayMax;
             }
 
             public override void Draw()
@@ -44,6 +48,9 @@ namespace SamplePlugin
                     plugin.SendToBark("Test title", "Test content");
                 }
 
+                ImGui.InputInt("Min Bird timer delay (min)", ref birdTimerDelayMin);
+                ImGui.InputInt("Max Bird timer delay (min)", ref birdTimerDelayMax);
+
                 if (ImGui.Button("Save Config"))
                 {
                     if (barkServer != config.BarkServer || delayMs != config.userDelayMs)
@@ -51,6 +58,8 @@ namespace SamplePlugin
                         Log.Information("Save triggered!");
                         config.userDelayMs = delayMs;
                         config.BarkServer = barkServer;
+                        config.birdTimerDelayMin = birdTimerDelayMin;
+                        config.birdTimerDelayMax = birdTimerDelayMax;
                         config.Save();
                     }
                 }
