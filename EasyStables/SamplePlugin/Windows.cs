@@ -53,15 +53,12 @@ namespace SamplePlugin
 
                 if (ImGui.Button("Save Config"))
                 {
-                    if (barkServer != config.BarkServer || delayMs != config.userDelayMs)
-                    {
-                        Log.Information("Save triggered!");
-                        config.userDelayMs = delayMs;
-                        config.BarkServer = barkServer;
-                        config.birdTimerDelayMin = birdTimerDelayMin;
-                        config.birdTimerDelayMax = birdTimerDelayMax;
-                        config.Save();
-                    }
+                    Log.Information("Save triggered!");
+                    config.userDelayMs = delayMs;
+                    config.BarkServer = barkServer;
+                    config.birdTimerDelayMin = birdTimerDelayMin;
+                    config.birdTimerDelayMax = birdTimerDelayMax;
+                    config.Save();
                 }
             }
 
