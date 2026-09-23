@@ -899,7 +899,8 @@ public sealed class Plugin : IDalamudPlugin
             if (!isReady)
             {
                 var remainingTime = remainingTrainingTimeToMs(trainingTextNode);
-                chocoboTimeToFeed.Add(chocoboIdentifier, remainingTime);
+                // C#'s Dictionary::Add is moronic and throws when the key is already present. Just override:
+                chocoboTimeToFeed[chocoboIdentifier] = remainingTime;
             }
 
             if (isCapped)
@@ -950,12 +951,12 @@ public sealed class Plugin : IDalamudPlugin
                 closeStablesAtNextTick = true;
 
                 var randomDelayMin = (Configuration.birdTimerDelayMin + Random.Shared.NextDouble() * (Configuration.birdTimerDelayMax - Configuration.birdTimerDelayMin));
-                timeToDoStuffInStableCleanliness += (long)(randomDelayMin * 1000 * 60);
+                timeToDoStuffInStableCleanliness = Environment.TickCount64 + (long)(randomDelayMin * 1000 * 60);
 
                 if (chocoboTimeToFeed.Count > 0)
                 {
                     var msUntilNextFeed = chocoboTimeToFeed.Values.Max();
-                    timeToDoStuffInStableCleanliness = Environment.TickCount64 + msUntilNextFeed;
+                    timeToDoStuffInStableCleanliness += msUntilNextFeed;
                     chocoboTimeToFeed.Clear();
                 } else {
                     // if there are no chocobos to feed next, try again in one hour. timeToDoStuffInStableCleanliness was already incremented above.
