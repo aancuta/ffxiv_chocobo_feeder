@@ -82,6 +82,8 @@ public sealed class Plugin : IDalamudPlugin
 
     private Dictionary<string, string> chocoboRanks = new Dictionary<string, string>();
 
+    private Dictionary<string, long> chocoboTimeToFeed = new Dictionary<string, long>();
+
     private HttpClient httpClient = new HttpClient();
 
     public async Task SendToBark(string title, string content)
@@ -837,7 +839,6 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         bool anyChocoboFed = false;
-        int msUntilNextFeed = -1;
 
         var allChocobos = innerChocoboListAsAtkComponentList->UldManager.NodeList;
         for (int i = 2; i < innerChocoboListAsAtkComponentList->UldManager.NodeListCount; ++i)
@@ -891,15 +892,15 @@ public sealed class Plugin : IDalamudPlugin
                 continue;
             }
 
+            string chocoboIdentifier = $"{chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()}";
+
             bool isCapped = IsChocoboCapped(chocoboRankTextNode);
             bool isReady = IsChocoboReady(trainingTextNode);
             if (!isReady)
             {
                 var remainingTime = remainingTrainingTimeToMs(trainingTextNode);
-                msUntilNextFeed = Math.Max(msUntilNextFeed, remainingTime);
+                chocoboTimeToFeed.Add(chocoboIdentifier, remainingTime);
             }
-
-            string chocoboIdentifier = $"{chocoboNameTextNode->GetText()}@{chocoboOwnerTextNode->GetText()}";
 
             if (isCapped)
             {
@@ -948,11 +949,16 @@ public sealed class Plugin : IDalamudPlugin
                 syntheticStablesListClick(stablesAddon, 0);
                 closeStablesAtNextTick = true;
 
-                if (msUntilNextFeed >= 0)
+                var randomDelayMin = (Configuration.birdTimerDelayMin + Random.Shared.NextDouble() * (Configuration.birdTimerDelayMax - Configuration.birdTimerDelayMin));
+                timeToDoStuffInStableCleanliness += (long)(randomDelayMin * 1000 * 60);
+
+                if (chocoboTimeToFeed.Count > 0)
                 {
+                    var msUntilNextFeed = chocoboTimeToFeed.Values.Max();
                     timeToDoStuffInStableCleanliness = Environment.TickCount64 + msUntilNextFeed;
-                    var randomDelayMin = (Configuration.birdTimerDelayMin + Random.Shared.NextDouble() * (Configuration.birdTimerDelayMax - Configuration.birdTimerDelayMin));
-                    timeToDoStuffInStableCleanliness += (long)(randomDelayMin * 1000 * 60);
+                    chocoboTimeToFeed.Clear();
+                } else {
+                    // if there are no chocobos to feed next, try again in one hour. timeToDoStuffInStableCleanliness was already incremented above.
                 }
             }
             this.resetTimers();
@@ -1040,12 +1046,25 @@ public sealed class Plugin : IDalamudPlugin
             if (fedChocobosThatCapped.Any())
             {
                 ChatGui.Print($"[Easy Stables] {fedChocobosThatCapped.Count()} Birds capped during session:");
+
+                bool anyOnionNeeded = false;
+                ChatGui.Print("birbcapped:");
                 foreach (var cappedFedChocobo in fedChocobosThatCapped)
                 {
                     string rank = chocoboRanks.GetValueOrDefault(cappedFedChocobo, "N/A");
-                    ChatGui.Print($"birbcapped: {cappedFedChocobo} on rank {rank}");
+
+                    bool thisChocoboNeedsOnion = false;
+                    if (Int32.TryParse(rank, out int numValue) && numValue >= 9 && numValue < 19)
+                    {
+                        thisChocoboNeedsOnion = anyOnionNeeded = true;
+                    }
+                    ChatGui.Print($"{cappedFedChocobo} on rank {rank} {(thisChocoboNeedsOnion ? "[ONION NEEDED]" : "")}");
                 }
 
+                if (anyOnionNeeded)
+                {
+                    ChatGui.Print("Please feel free to poke any FC management in-game for a free onion for your level-up, courtesy of the FC! <3");
+                }
             }
             else
             {
