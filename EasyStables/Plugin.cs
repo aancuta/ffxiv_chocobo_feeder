@@ -981,12 +981,12 @@ public sealed class Plugin : IDalamudPlugin
         Vector3 position = new(target.Position.X, target.Position.Z, target.Position.Y);
         Vector3 selfPosition = new(Player.Position.X, Player.Position.Z, Player.Position.Y);
 
-        return Math.Max(0, Vector3.Distance(position, selfPosition) - target.HitboxRadius - Svc.Objects.LocalPlayer.HitboxRadius);
+        return Math.Max(0, Vector3.Distance(position, selfPosition));
     }
 
     private bool isObjectWithinDistance(IGameObject obj, float yalms)
     {
-        return GetTargetDistance(obj) <= yalms;
+        return GetTargetDistance(obj) < yalms;
     }
 
     private unsafe bool isStables(IGameObject obj)
@@ -1000,7 +1000,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         foreach (var obj in Svc.Objects)
         {
-            if (obj != null && isStables(obj) && isObjectWithinDistance(obj, 4.0f)) {
+            if (obj != null && isStables(obj) && isObjectWithinDistance(obj, 6.5f)) {
                 return obj;
             }
         }
