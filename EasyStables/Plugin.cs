@@ -1064,7 +1064,10 @@ public sealed class Plugin : IDalamudPlugin
 
                 if (anyOnionNeeded)
                 {
-                    ChatGui.Print("Please feel free to poke any FC management in-game for a free onion for your level-up, courtesy of the FC! <3");
+                    ChatGui.Print("Feel free to poke any FC management in-game for a free onion for your level-up, courtesy of the FC! <3");
+                    ChatGui.Print("This will save you up to 2 mil gil as a thank you for being with us!");
+                    ChatGui.Print("Please check out our Chocobo Guide for info on how to use onions before you use it!");
+                    ChatGui.Print("https://discord.com/channels/993258181608357949/1209321017764216862/1209321399546810408");
                 }
             }
             else
