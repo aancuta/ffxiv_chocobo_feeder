@@ -919,12 +919,17 @@ public sealed class Plugin : IDalamudPlugin
                 // C#'s Dictionary::Add is moronic and throws when the key is already present. Just override:
                 chocoboTimeToFeed[chocoboIdentifier] = remainingTime;
             }
+            chocoboRanks[chocoboIdentifier] = chocoboRankTextNode->GetText().ToString();
 
             if (isCapped)
             {
-                cappedChocobos.Add(chocoboIdentifier);
+                // TODO: edge case - the chocobo can cap on a different rank. cappedChocobos and fedChocobos need to be converted to Dict<identifier -> rank> so we can check it here.
+                bool newCap = cappedChocobos.Add(chocoboIdentifier); // don't send a message if we already sent it before
+                bool didFeed = fedChocobos.Contains(chocoboIdentifier);
+                if (newCap && didFeed) {
+                    SendToBark("birbcapped", cappedChocoboString(chocoboIdentifier));
+                }
             }
-            chocoboRanks[chocoboIdentifier] = chocoboRankTextNode->GetText().ToString();
 
             if ((!isCapped && isReady)) {
                 // the chocobo is not capped and ready, let's click it to start training:
@@ -1038,6 +1043,18 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
+    private string cappedChocoboString(string cappedFedChocobo)
+    {
+        string rank = chocoboRanks.GetValueOrDefault(cappedFedChocobo, "N/A");
+
+        bool thisChocoboNeedsOnion = false;
+        if (Int32.TryParse(rank, out int numValue) && numValue >= 9 && numValue < 19)
+        {
+            thisChocoboNeedsOnion = true;
+        }
+        return $"{cappedFedChocobo} on rank {rank} {(thisChocoboNeedsOnion ? "[ONION NEEDED]" : "")}";
+    }
+
     private unsafe void OnDTRClick(DtrInteractionEvent ev)
     {
         isEnabled = !isEnabled;
@@ -1069,14 +1086,9 @@ public sealed class Plugin : IDalamudPlugin
                 ChatGui.Print("birbcapped:");
                 foreach (var cappedFedChocobo in fedChocobosThatCapped)
                 {
-                    string rank = chocoboRanks.GetValueOrDefault(cappedFedChocobo, "N/A");
-
-                    bool thisChocoboNeedsOnion = false;
-                    if (Int32.TryParse(rank, out int numValue) && numValue >= 9 && numValue < 19)
-                    {
-                        thisChocoboNeedsOnion = anyOnionNeeded = true;
-                    }
-                    ChatGui.Print($"{cappedFedChocobo} on rank {rank} {(thisChocoboNeedsOnion ? "[ONION NEEDED]" : "")}");
+                    string toPrint = cappedChocoboString(cappedFedChocobo);
+                    anyOnionNeeded |= toPrint.Contains("[ONION NEEDED]");
+                    ChatGui.Print(toPrint);
                 }
 
                 if (anyOnionNeeded)
