@@ -7,11 +7,13 @@ using Dalamud.Game.ClientState.GamePad;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Game.Command;
 using Dalamud.Game.Gui.Dtr;
+using Dalamud.Interface;
 using Dalamud.Interface.Windowing;
 using Dalamud.IoC;
 using Dalamud.Memory;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using Dalamud.Utility;
 using ECommons;
 using ECommons.DalamudServices;
 using ECommons.DalamudServices.Legacy;
@@ -31,6 +33,7 @@ using FFXIVClientStructs.FFXIV.Component.GUI;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -42,6 +45,8 @@ using System.Threading.Tasks;
 using static ECommons.UIHelpers.AddonMasterImplementations.AddonMaster;
 using static FFXIVClientStructs.FFXIV.Client.Graphics.Kernel.VertexShader;
 using static FFXIVClientStructs.FFXIV.Component.GUI.AtkUIColorHolder.Delegates;
+using SeStringBuilder = Lumina.Text.SeStringBuilder;
+
 namespace EasyStables;
 
 public sealed class Plugin : IDalamudPlugin
@@ -89,7 +94,7 @@ public sealed class Plugin : IDalamudPlugin
     public async Task SendToBark(string title, string content)
     {
         Log.Info(Configuration.BarkServer);
-        if (Configuration.BarkServer.IsNullOrEmpty())
+        if (string.IsNullOrEmpty(Configuration.BarkServer))
         {
             // don't error out for no server URL, just don't send the notification
             return;
@@ -266,6 +271,22 @@ public sealed class Plugin : IDalamudPlugin
         Configuration.Save();
     }
 
+    private Vector4 GetDTRColor(float timeLeft, bool isEnabled)
+    {
+        if (isEnabled)
+        {
+            return KnownColor.LightGreen.Vector();
+        } else {
+            if (timeLeft > 0)
+            {
+                return KnownColor.Orange.Vector();
+            } else
+            {
+                return KnownColor.OrangeRed.Vector();
+            }
+        }
+    }
+
     private unsafe void FrameworkUpdate(IFramework framework)
     {
         if (timerNotReadyOrNeedsStart(ref timeToDoStuffInFrameworkUpdate, Configuration.userDelayMs))
@@ -274,16 +295,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        string dtrText = "Stables: ";
-
-        if (isEnabled)
-        {
-            dtrText += "Enabled";
-        } else
-        {
-            dtrText += "Disabled";
-        }
-
+        string dtrText = "birbs: ";
 
         // convert remaining bird timer to minutes:
         float timeToNextTimer = timeToDoStuffInStableCleanliness - Environment.TickCount64;
@@ -296,7 +308,7 @@ public sealed class Plugin : IDalamudPlugin
         else
         {
             timeToNextTimer /= 60; // convert to minutes
-            unitOfMeasurement = "min";
+            unitOfMeasurement = "m";
         }
 
         timeToNextTimer = (float)Math.Round(timeToNextTimer, 0);
@@ -304,12 +316,17 @@ public sealed class Plugin : IDalamudPlugin
         if (timeToNextTimer <= 0)
         {
             timeToNextTimer = 0;
-        }
-        string timeLeft = " - " + (timeToNextTimer == 0 ? "Ready!" : timeToNextTimer.ToString() + unitOfMeasurement);
+        } 
+
+        string timeLeft = (timeToNextTimer == 0 ? "Ready!" : timeToNextTimer.ToString() + unitOfMeasurement);
         dtrText += timeLeft;
 
-        _dtrEntry.Text = new Dalamud.Game.Text.SeStringHandling.SeString(new Dalamud.Game.Text.SeStringHandling.Payloads.TextPayload(dtrText));
-
+        _dtrEntry.Text = new SeStringBuilder()
+                .PushColorRgba(GetDTRColor(timeToNextTimer, isEnabled))
+                .Append(dtrText)
+                .PopColor()
+                .ToReadOnlySeString()
+                .ToDalamudString();
 
         if (!EzThrottler.Throttle("OpenStables", Configuration.userDelayMs))
         {
